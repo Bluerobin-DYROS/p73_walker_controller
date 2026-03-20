@@ -263,7 +263,34 @@ void *P73Controller::TaskCtrlThread()
                 }
                 else if (dc_.task_cmd_.task_mode == 4)  // IK MODE (CONTACT)
                 {
+                    WBC::SetContact(rd_, true, true);
+                    static bool is_ik_init = true;
+                    static double time_init = 0.0;
+                    if (is_ik_init){
+                        time_init = rd_.control_time_;
+                        rd_.link_[Pelvis].x_init = rd_.link_[Pelvis].xpos;
 
+                        std::cout << "==================================" << std::endl;
+                        std::cout << "========== IK CONTACT Mode ==========" << std::endl;
+                        std::cout << "==================================" << std::endl;
+
+                        is_ik_init = false;
+                    }
+
+                    rd_.link_[Pelvis].x_desired = rd_.link_[Pelvis].x_init;
+                    rd_.link_[Pelvis].x_desired(2) += -0.2;
+                    rd_.link_[Pelvis].SetTrajectoryQuintic(rd_.control_time_, time_init, time_init + 3.0, rd_.link_[Pelvis].x_init, rd_.link_[Pelvis].x_desired);
+
+                    rd_.J_task.setZero(6, MODEL_DOF_VIRTUAL);
+                    rd_.e_task.setZero(6);
+                    rd_.J_task = rd_.link_[Pelvis].jac;
+                    rd_.e_task.head(3) = rd_.link_[Pelvis].x_traj - rd_.link_[Pelvis].xpos;
+                    rd_.e_task.tail(3) = -DyrosMath::getPhi(rd_.link_[Pelvis].rotm, Eigen::Matrix3d::Identity());
+                    WBC::NullspaceInverseKinematics(rd_);
+
+                    for (int i = 0; i < MODEL_DOF; i++) {
+                        rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                    }
                 }
 #ifdef COMPILE_P73_CC
                 if (dc_.task_cmd_.task_mode >= 5 && dc_.task_cmd_.task_mode < 10)

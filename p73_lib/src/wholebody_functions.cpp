@@ -24,7 +24,7 @@ namespace WBC
         rd_.link_[COM_id].SetInitialWithPosition();
     }
 
-    void SetContact(RobotEigenData &rd_, bool left_foot, bool right_foot, bool left_hand, bool right_hand)
+    void SetContact(RobotEigenData &rd_, bool left_foot, bool right_foot)
     {
         rd_.ee_[0].contact = left_foot;
         rd_.ee_[1].contact = right_foot;
@@ -40,18 +40,6 @@ namespace WBC
         {
             rd_.contact_part[rd_.contact_index] = P73::Right_Foot;
             rd_.ee_idx[rd_.contact_index] = 1;
-            rd_.contact_index++;
-        }
-        if (left_hand)
-        {
-            rd_.contact_part[rd_.contact_index] = P73::Waist;
-            rd_.ee_idx[rd_.contact_index] = 2;
-            rd_.contact_index++;
-        }
-        if (right_hand)
-        {
-            rd_.contact_part[rd_.contact_index] = P73::Waist;
-            rd_.ee_idx[rd_.contact_index] = 3;
             rd_.contact_index++;
         }
 
@@ -168,7 +156,7 @@ namespace WBC
         }
     }
 
-    VectorQd NullspaceInverseKinematics(RobotEigenData& rd_)
+    void NullspaceInverseKinematics(RobotEigenData& rd_)
     {
         Eigen::MatrixVVd Ni = Eigen::MatrixVVd::Identity() - DyrosMath::pinv_SVD(rd_.J_C) * rd_.J_C;
         Eigen::MatrixXd J_pre = rd_.J_task * Ni;
@@ -176,11 +164,6 @@ namespace WBC
         Eigen::VectorVQd q_delta = J_pinv * rd_.e_task;
 
         rd_.q_desired = rd_.q_ + q_delta.tail(MODEL_DOF);
-        
-        Eigen::VectorQd torque_pd; torque_pd.setZero();
-        torque_pd = JointPositionToMotorTorque(rd_);
-
-        return (torque_pd);
     }
 
     void FrictionCompensationTorques(RobotEigenData& rd_)

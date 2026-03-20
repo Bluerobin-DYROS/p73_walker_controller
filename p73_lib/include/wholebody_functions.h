@@ -12,7 +12,7 @@ namespace WBC
     //--- Contact
     void SetContactInit(RobotEigenData &rd_);
     void SetTrajectoryInit(RobotEigenData &rd_);
-    void SetContact(RobotEigenData &Robot, bool left_foot, bool right_foot, bool left_hand = 0, bool right_hand = 0);
+    void SetContact(RobotEigenData &Robot, bool left_foot, bool right_foot);
     void ContactCalcDefault(RobotEigenData &Robot);
 
     void CalcContact(RobotEigenData &rd_);
@@ -23,7 +23,7 @@ namespace WBC
     void FrictionCompensationTorques(RobotEigenData& rd_);
 
     //---Whole-body Inverse Kinematics Controller
-    VectorQd NullspaceInverseKinematics(RobotEigenData &rd_);
+    void NullspaceInverseKinematics(RobotEigenData &rd_);
 
     //--- Mapping
     VectorQd JointTorqueToMotorTorque(RobotEigenData& rd_, const Eigen::VectorQd& torque_joint);
