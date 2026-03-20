@@ -720,7 +720,7 @@ void StateEstimator::SendCommand()
         JointCommand cmd;
         if (robot_data.joint.system_status == ECAT_OPERATIONAL || robot_data.joint.system_status == ECAT_CONTROL){
             cmd.system_command  = CONTROL_COMMAND;
-            for (int i = 0; i < JOINT_NUM; i++) {
+            for (int i = 0; i < MODEL_DOF; i++) {
                 if (torque_command[i] > torque_limit[i]) torque_command[i] = torque_limit[i];
                 if (torque_command[i] < -torque_limit[i]) torque_command[i] = -torque_limit[i];
                 cmd.target_torque[i] = torque_command[P73::JOINT_2_ELMO[i]];
@@ -748,7 +748,7 @@ void StateEstimator::SendCommand()
         JointCommand cmd;
         if (robot_data.joint.system_status == ECAT_OPERATIONAL || robot_data.joint.system_status == ECAT_CONTROL){
             cmd.system_command  = CONTROL_COMMAND;
-            for (int i = 0; i < JOINT_NUM; i++) {
+            for (int i = 0; i < MODEL_DOF; i++) {
                 cmd.target_torque[i] = torque_command[i];
             }
         }

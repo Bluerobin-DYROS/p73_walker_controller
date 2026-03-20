@@ -178,8 +178,7 @@ namespace WBC
         rd_.q_desired = rd_.q_ + q_delta.tail(MODEL_DOF);
         
         Eigen::VectorQd torque_pd; torque_pd.setZero();
-        for (int i = 0; i < MODEL_DOF; i++)
-            torque_pd(i) = rd_.Kp[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd[i] * (-rd_.q_dot_(i));
+        torque_pd = JointPositionToMotorTorque(rd_);
 
         return (torque_pd);
     }
@@ -213,7 +212,7 @@ namespace WBC
         static FourBarKinematics four_bar_kinematics_;
         four_bar_kinematics_.Joint2MotorDesiredPos(rd_.q_desired, q_desired_motor);
         for (int i = 0; i < MODEL_DOF; i++) {
-            torque_motor[i] = rd_.Kp[i] * (q_desired_motor[i] - rd_.q_motor_[i]) + rd_.Kd[i] * (0.0 - rd_.q_dot_motor_[i]);
+            torque_motor[i] = rd_.Kp_m[i] * (q_desired_motor[i] - rd_.q_motor_[i]) + rd_.Kd_m[i] * (0.0 - rd_.q_dot_motor_[i]);
         }
 
         return torque_motor;

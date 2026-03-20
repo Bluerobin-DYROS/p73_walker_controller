@@ -80,9 +80,9 @@ struct RobotEigenData
     double yaw_init;
     Matrix3d imu_euler_cov, imu_ang_vel_cov, imu_lin_acc_cov;
 
-    std::vector<double> Kp, Kd;
+    std::vector<double> Kp_m, Kd_m;
+    std::vector<double> Kp_j, Kd_j;
     std::vector<double> tau_coulomb, tau_viscous;
-    Eigen::VectorQd Kp_j, Kd_j;
     
     VectorQd q_desired, q_dot_desired, torque_desired;
     VectorQd q_motor_desired, torque_motor_desired;

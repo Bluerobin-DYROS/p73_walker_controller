@@ -7,10 +7,30 @@ P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     , cc_(*new CustomController(dc_, rd_))
     #endif
 {
-    node_->declare_parameter<std::vector<double>>("Kp", std::vector<double>(MODEL_DOF, 0.0));
-    node_->declare_parameter<std::vector<double>>("Kd", std::vector<double>(MODEL_DOF, 0.0));
-    node_->get_parameter("Kp", rd_.Kp);
-    node_->get_parameter("Kd", rd_.Kd);
+    //--- PD Gain
+    node_->declare_parameter<std::vector<double>>("Kp_j", std::vector<double>(MODEL_DOF, 0.0));
+    node_->declare_parameter<std::vector<double>>("Kd_j", std::vector<double>(MODEL_DOF, 0.0));
+    node_->get_parameter("Kp_j", rd_.Kp_j);
+    node_->get_parameter("Kd_j", rd_.Kd_j);
+
+    node_->declare_parameter<std::vector<double>>("Kp_m", std::vector<double>(MODEL_DOF, 0.0));
+    node_->declare_parameter<std::vector<double>>("Kd_m", std::vector<double>(MODEL_DOF, 0.0));
+    node_->get_parameter("Kp_m", rd_.Kp_m);
+    node_->get_parameter("Kd_m", rd_.Kd_m);
+
+    node_->declare_parameter<std::vector<double>>("tau_coulomb", std::vector<double>(MODEL_DOF, 0.0));
+    node_->declare_parameter<std::vector<double>>("tau_viscous", std::vector<double>(MODEL_DOF, 0.0));
+    node_->get_parameter("tau_coulomb", rd_.tau_coulomb);
+    node_->get_parameter("tau_viscous", rd_.tau_viscous);
+
+    std::cout << "tau_coulomb: " << " (size=" << rd_.tau_coulomb.size() << "): ";
+    for (const auto &param : rd_.tau_coulomb)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+    std::cout << "tau_viscous: " << " (size=" << rd_.tau_viscous.size() << "): ";
+    for (const auto &param : rd_.tau_viscous)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
 
     // Create callback group for p73 controller
     cbg_p73_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -49,6 +69,7 @@ void *P73Controller::TaskCtrlThread()
 
     while (stm_.robot.is_initialized() && rclcpp::ok()) {
         if (dc_.triggerThread1) {
+
             exec_p73_.spin_once(std::chrono::microseconds(1));
             dc_.triggerThread1 = false;
 
@@ -74,19 +95,165 @@ void *P73Controller::TaskCtrlThread()
             {
                 if (!dc_.positionHoldSwitch)
                     rd_.q_desired = DyrosMath::cubicVector(rd_.control_time_, dc_.pos_ctrl_t_, dc_.pos_ctrl_t_ + dc_.pos_ctrl_traj_t_, dc_.pos_ctrl_q_init, dc_.pos_ctrl_q_des, dc_.pos_ctrl_q_vel_init, zero_m);
-                rd_.torque_desired = WBC::JointPositionToMotorTorque(rd_);
+                
+                if(!dc_.simMode){
+                    rd_.torque_desired = WBC::JointPositionToMotorTorque(rd_);
+                }
+                else{
+                    for(int i = 0; i < MODEL_DOF; i++)
+                    {
+                        rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                    }
+                }
             }
             else if (dc_.tc_mode)
             {
                 if (dc_.task_cmd_.task_mode == 0)   // JOINT TUNE MODE
                 {
+                    rd_.torque_desired.setZero();
 
+                    static bool is_pd_tune_init = true;
+                    static double start_time = 0.0;
+                    static double phase = 0.0;
+
+                    double current_time = rd_.control_time_;
+
+                    static Eigen::VectorQd q_init_ = Eigen::VectorQd::Zero();
+                    static Eigen::VectorQd q_init_motor_ = Eigen::VectorQd::Zero();
+
+                    const int sinusoid_joint_target_ = 0;
+                    const double sinusoid_joint_min_ = 0.1;
+                    const double sinusoid_joint_max_ = 0.1;
+                    const double sinusoid_period_ = 3.0;
+
+                    if (is_pd_tune_init == true)
+                    {
+                        q_init_ = rd_.q_;
+                        q_init_motor_ = rd_.q_motor_;
+                        start_time = current_time;
+
+                        const double A = 0.1;
+                        const double B = 0.1;
+
+                        const double q0 = q_init_(sinusoid_joint_target_);
+
+                        const double c = q0 + 0.5 * (A - B);
+                        const double a = 0.5 * (A + B);
+
+                        double sin_phi = (q0 - c) / a;
+                        sin_phi = std::min(1.0, std::max(-1.0, sin_phi));
+
+                        phase = std::asin(sin_phi);
+
+                        std::cout << "==================================" << std::endl;
+                        std::cout << "========== PD TUNE Mode ==========" << std::endl;
+                        std::cout << "TARGET JOINT : " << sinusoid_joint_target_ << std::endl;
+                        std::cout << "JOINT MIN    : " << sinusoid_joint_min_    << std::endl;
+                        std::cout << "JOINT MAX    : " << sinusoid_joint_max_    << std::endl;
+                        std::cout << "PERIOD [s]   : " << sinusoid_period_       << std::endl;
+                        std::cout << "PHASE [rad]   : " << phase                  << std::endl;
+                        std::cout << "==================================" << std::endl;
+                        is_pd_tune_init = false;
+                    }
+
+                    rd_.q_desired = q_init_;
+
+                    //--- Sinusoidal Joint Trajectory
+                    const double t = current_time - start_time;
+                    const double w = 2.0 * M_PI / sinusoid_period_;
+
+                    const double A = sinusoid_joint_max_;
+                    const double B = sinusoid_joint_min_;
+
+                    const double q0 = q_init_(sinusoid_joint_target_);
+                    const double c = q0 + 0.5 * (A - B);
+                    const double a = 0.5 * (A + B);
+
+                    rd_.q_desired(sinusoid_joint_target_) = c + a * std::sin(w * t + phase);
+
+                    if(!dc_.simMode){
+                        for(int i = 0; i < MODEL_DOF; i++)
+                        {
+                            rd_.torque_desired(i) = (rd_.Kp_j[i]) * (q_init_motor_[i] - rd_.q_motor_[i]) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_motor_(i));
+                        }
+                    }
+                    else{
+                        for(int i = 0; i < MODEL_DOF; i++)
+                        {
+                            rd_.torque_desired(i) = (rd_.Kp_j[i]) * (q_init_[i] - rd_.q_[i]) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                        }
+                    }
+
+                    Eigen::VectorQd torque_joint; torque_joint.setZero();
+                    Eigen::VectorQd torque_motor; torque_motor.setZero();
+
+                    // ================================
+                    if(sinusoid_joint_target_ == 0 || sinusoid_joint_target_ == 1 || sinusoid_joint_target_ == 2 || sinusoid_joint_target_ == 3 ||
+                    sinusoid_joint_target_ == 6 || sinusoid_joint_target_ == 7 || sinusoid_joint_target_ == 8 || sinusoid_joint_target_ == 9)
+                    {
+                        for (int i = 0; i < MODEL_DOF; i++) {
+                            torque_joint(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                        }
+
+                        if(!dc_.simMode)
+                        {
+                            torque_motor = rd_.four_bar_Jaco_.transpose() * torque_joint;
+                        }
+                        else
+                        {
+                            torque_motor = torque_joint;
+                        }
+
+                        rd_.torque_desired(sinusoid_joint_target_) = torque_motor(sinusoid_joint_target_);
+                    }
+                    else if(sinusoid_joint_target_ == 4 || sinusoid_joint_target_ == 5)
+                    {
+                        for (int i = 0; i < MODEL_DOF; i++) {
+                            torque_joint(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                        }
+
+                        if(!dc_.simMode)
+                        {
+                            torque_motor = rd_.four_bar_Jaco_.transpose() * torque_joint;
+                            rd_.torque_desired(4) = torque_motor(4);
+                            rd_.torque_desired(5) = torque_motor(5);
+                        }
+                        else
+                        {
+                            torque_motor = torque_joint;
+                            rd_.torque_desired(sinusoid_joint_target_) = torque_motor(sinusoid_joint_target_);
+                        }
+                    }
+                    else if(sinusoid_joint_target_ == 10 || sinusoid_joint_target_ == 11)
+                    {
+                        for (int i = 0; i < MODEL_DOF; i++) {
+                            torque_joint(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                        }
+
+                        if(!dc_.simMode)
+                        {
+                            torque_motor = rd_.four_bar_Jaco_.transpose() * torque_joint;
+
+                            rd_.torque_desired(10) = torque_motor(10);
+                            rd_.torque_desired(11) = torque_motor(11);
+                        }
+                        else
+                        {
+                            torque_motor = torque_joint;
+                            rd_.torque_desired(sinusoid_joint_target_) = torque_motor(sinusoid_joint_target_);
+                        }
+                    }
+
+                    // joint_desired_log << rd_.q_desired(sinusoid_joint_target_) << std::endl;
+                    // joint_position_log << rd_.q_(sinusoid_joint_target_) << std::endl;
+                    // joint_velocity_log << rd_.q_dot_(sinusoid_joint_target_) << std::endl;
+                    // torque_sum_log << rd_.torque_desired.head(12).transpose() << std::endl;
                 }
                 else if (dc_.task_cmd_.task_mode == 1)  // FRICTION COMPENSATION MODE
                 {
 
                 }
-                else if (dc_.task_cmd.task_mode == 2)   // SIMPLE JOINT MOTION MODE
+                else if (dc_.task_cmd_.task_mode == 2)  // SIMPLE JOINT MOTION MODE
                 {
 
                 }
@@ -121,15 +288,15 @@ void *P73Controller::TaskCtrlThread()
             else
             {
                 if(dc_.simMode){
-                    WBC::SetContact(rd_, 1, 1);
-                    rd_.torque_desired = WBC::ContactForceFrictionConeConstraintTorque(rd_, WBC::GravityCompensationTorque(rd_));
+                    static Eigen::VectorQd q_init = rd_.q_;
+
+                    for(int i = 0; i < MODEL_DOF; i++)
+                    {
+                        rd_.torque_desired(i) = rd_.Kp_j[i] * (q_init(i) - rd_.q_(i)) - rd_.Kd_j[i] * rd_.q_dot_(i);
+                    }
                 }
                 else{
                     rd_.torque_desired.setZero();
-                }
-
-                if(!dc_.simMode){
-                    rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);
                 }
             }
 
