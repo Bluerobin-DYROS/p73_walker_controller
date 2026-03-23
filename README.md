@@ -1,13 +1,12 @@
 # 1. Prerequisites
 ## 1. Pinocchio
 ```
-sudo apt install ros-humble-pinocchio
+sudo apt install ros-jazzy-pinocchio
 ```
 ## 2. br_driver
 ```
-cd ~/Downloads
-git clone https://github.com/P73-project/br_driver_yongarry_edit.git
-cd br_driver_yongarry_edit
+git clone https://github.com/Bluerobin-DYROS/p73_sys_ws.git
+cd p73_sys_ws
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
