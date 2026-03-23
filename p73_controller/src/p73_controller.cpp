@@ -13,10 +13,28 @@ P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     node_->get_parameter("Kp_j", rd_.Kp_j);
     node_->get_parameter("Kd_j", rd_.Kd_j);
 
+    std::cout << "Kp_j: " << " (size=" << rd_.Kp_j.size() << "): ";
+    for (const auto &param : rd_.Kp_j)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+    std::cout << "Kd_j: " << " (size=" << rd_.Kd_j.size() << "): ";
+    for (const auto &param : rd_.Kd_j)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+
     node_->declare_parameter<std::vector<double>>("Kp_m", std::vector<double>(MODEL_DOF, 0.0));
     node_->declare_parameter<std::vector<double>>("Kd_m", std::vector<double>(MODEL_DOF, 0.0));
     node_->get_parameter("Kp_m", rd_.Kp_m);
     node_->get_parameter("Kd_m", rd_.Kd_m);
+
+    std::cout << "Kp_m: " << " (size=" << rd_.Kp_m.size() << "): ";
+    for (const auto &param : rd_.Kp_j)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+    std::cout << "Kd_m: " << " (size=" << rd_.Kd_m.size() << "): ";
+    for (const auto &param : rd_.Kd_j)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
 
     node_->declare_parameter<std::vector<double>>("tau_coulomb", std::vector<double>(MODEL_DOF, 0.0));
     node_->declare_parameter<std::vector<double>>("tau_viscous", std::vector<double>(MODEL_DOF, 0.0));
@@ -307,10 +325,6 @@ void *P73Controller::TaskCtrlThread()
                     
                 }
 #endif
-                if(!dc_.simMode){
-                    rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);
-                }
-
             }
             else
             {

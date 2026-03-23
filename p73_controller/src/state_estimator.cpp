@@ -199,6 +199,7 @@ void *StateEstimator::StateEstimatorThread()
         exec_se_.spin_once(std::chrono::microseconds(10));
         if (!robot.is_initialized())
             break;
+        
         GetRobotData();
         auto d0 = chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - t0).count();
         auto t1 = chrono::steady_clock::now();
@@ -276,10 +277,11 @@ void StateEstimator::GetRobotData()
             rcv_cnt++;
             for(int i = 0; i < MODEL_DOF; i++)
             {
-                q_motor_[i] = robot_data.joint.position_external[P73::ELMO_2_JOINT[i]];
-                q_dot_motor_[i] = robot_data.joint.velocity[P73::ELMO_2_JOINT[i]];
-                q_torque_[i] = robot_data.joint.torque[P73::ELMO_2_JOINT[i]];
-                elmo_state[i] = getElmoState(robot_data.joint.status_word[P73::ELMO_2_JOINT[i]]);
+                const int actuator_idx = P73::ELMO_2_JOINT[i];
+                q_motor_(i) = robot_data.joint.position_external[actuator_idx];
+                q_dot_motor_(i) = robot_data.joint.velocity[actuator_idx];
+                q_torque_(i) = robot_data.joint.torque[actuator_idx];
+                elmo_state[i] = getElmoState(robot_data.joint.status_word[actuator_idx]);
             }
 
             four_bar_kinematics_.Motor2JointPosVel(q_motor_, q_, q_dot_motor_, q_dot_);
@@ -721,11 +723,13 @@ void StateEstimator::SendCommand()
         if (robot_data.joint.system_status == ECAT_OPERATIONAL || robot_data.joint.system_status == ECAT_CONTROL){
             cmd.system_command  = CONTROL_COMMAND;
             for (int i = 0; i < MODEL_DOF; i++) {
-                if (torque_command[i] > torque_limit[i]) torque_command[i] = torque_limit[i];
-                if (torque_command[i] < -torque_limit[i]) torque_command[i] = -torque_limit[i];
-                cmd.target_torque[i] = torque_command[P73::JOINT_2_ELMO[i]];
-                cmd.control_mode[i] = TORQUE_CONTROL;
-                cmd.max_torque[i] = maxTorqueCommand;
+                if (torque_command(i) > torque_limit[i]) torque_command(i) = torque_limit[i];
+                if (torque_command(i) < -torque_limit[i]) torque_command(i) = -torque_limit[i];
+
+                const int actuator_idx = P73::JOINT_2_ELMO[i];
+                cmd.target_torque[actuator_idx] = torque_command(i);
+                cmd.control_mode[actuator_idx] = TORQUE_CONTROL;
+                cmd.max_torque[actuator_idx] = maxTorqueCommand;
             }
         }
         else if (robot_data.joint.system_status == ECAT_SAFETY) {
