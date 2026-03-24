@@ -103,10 +103,10 @@ void *P73Controller::TaskCtrlThread()
                     static Eigen::VectorQd q_init_ = Eigen::VectorQd::Zero();
                     static Eigen::VectorQd q_init_motor_ = Eigen::VectorQd::Zero();
 
-                    const int sinusoid_joint_target_ = 4;
+                    const int sinusoid_joint_target_ = 12;
                     const double sinusoid_joint_min_ = 0.1;
                     const double sinusoid_joint_max_ = 0.1;
-                    const double sinusoid_period_ = 3.0;
+                    const double sinusoid_period_ = 1.5;
 
                     if (is_pd_tune_init == true)
                     {
@@ -171,7 +171,8 @@ void *P73Controller::TaskCtrlThread()
 
                     // ================================
                     if(sinusoid_joint_target_ == 0 || sinusoid_joint_target_ == 1 || sinusoid_joint_target_ == 2 || sinusoid_joint_target_ == 3 ||
-                    sinusoid_joint_target_ == 6 || sinusoid_joint_target_ == 7 || sinusoid_joint_target_ == 8 || sinusoid_joint_target_ == 9)
+                       sinusoid_joint_target_ == 6 || sinusoid_joint_target_ == 7 || sinusoid_joint_target_ == 8 || sinusoid_joint_target_ == 9 ||
+                       sinusoid_joint_target_ == 12)
                     {
                         for (int i = 0; i < MODEL_DOF; i++) {
                             torque_joint(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
@@ -327,7 +328,7 @@ void *P73Controller::TaskCtrlThread()
                     for (int i = 0; i < MODEL_DOF; i++) {
                         rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
                     }
-
+                     
                     if(!dc_.simMode){
                         rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);
                     }
