@@ -156,7 +156,7 @@ void *P73Controller::TaskCtrlThread()
                     if(!dc_.simMode){
                         for(int i = 0; i < MODEL_DOF; i++)
                         {
-                            rd_.torque_desired(i) = (rd_.Kp_j[i]) * (q_init_motor_[i] - rd_.q_motor_[i]) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_motor_(i));
+                            rd_.torque_desired(i) = (rd_.Kp_m[i]) * (q_init_motor_[i] - rd_.q_motor_[i]) + rd_.Kd_m[i] * (0.0 - rd_.q_dot_motor_(i));
                         }
                     }
                     else{
@@ -326,6 +326,10 @@ void *P73Controller::TaskCtrlThread()
 
                     for (int i = 0; i < MODEL_DOF; i++) {
                         rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                    }
+
+                    if(!dc_.simMode){
+                        rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);
                     }
                 }
 #ifdef COMPILE_P73_CC
