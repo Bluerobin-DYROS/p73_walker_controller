@@ -219,8 +219,8 @@ void *StateEstimator::StateEstimatorThread()
 
         if ((d0 + d1 + d2 + d3) > 1000)
         {
-            if (control_time_ > 0.1)
-                printf(" STATE : %7.1f stm over 1000, d0 : %ld, d1 : %ld, d2 : %ld, d3 : %ld\n", control_time_, d0, d1, d2, d3);
+            // if (control_time_ > 0.1)
+            //     printf(" STATE : %7.1f stm over 1000, d0 : %ld, d1 : %ld, d2 : %ld, d3 : %ld\n", control_time_, d0, d1, d2, d3);
         }
         
         // Sleep to maintain loop rate

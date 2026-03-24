@@ -277,7 +277,60 @@ void *P73Controller::TaskCtrlThread()
                 }
                 else if (dc_.task_cmd_.task_mode == 3)  // IK MODE (FLOAT)
                 {
+                    static bool is_ik_init = true;
+                    static double time_init = 0.0;
 
+                    constexpr double circle_period = 3.0;
+                    constexpr double circle_radius = 0.02;
+
+                    if (is_ik_init){
+                        time_init = rd_.control_time_;
+                        rd_.link_local_[Left_Foot].x_init = rd_.link_local_[Left_Foot].xpos;
+                        rd_.link_local_[Right_Foot].x_init = rd_.link_local_[Right_Foot].xpos;
+
+                        std::cout << "===================================" << std::endl;
+                        std::cout << "========== IK FLOAT Mode ==========" << std::endl;
+                        std::cout << "===================================" << std::endl;
+
+                        is_ik_init = false;
+                    }
+
+                    const double elapsed = rd_.control_time_ - time_init;
+                    const double omega = 2.0 * M_PI / circle_period;
+                    const double phase_left = omega * elapsed;
+                    const double phase_right = phase_left + M_PI;
+                    const double phase_left_0 = 0.0;
+                    const double phase_right_0 = M_PI;
+
+                    rd_.link_local_[Left_Foot].x_traj = rd_.link_local_[Left_Foot].x_init;
+
+                    rd_.link_local_[Right_Foot].x_traj = rd_.link_local_[Right_Foot].x_init;
+
+                    rd_.link_local_[Left_Foot].x_traj(0)  += circle_radius * (std::cos(phase_left) - std::cos(phase_left_0));
+                    rd_.link_local_[Left_Foot].x_traj(2)  += circle_radius * (std::sin(phase_left) - std::sin(phase_left_0));
+                    rd_.link_local_[Right_Foot].x_traj(0) += circle_radius * (std::cos(phase_right) - std::cos(phase_right_0));
+                    rd_.link_local_[Right_Foot].x_traj(2) += circle_radius * (std::sin(phase_right) - std::sin(phase_right_0));
+
+                    rd_.J_task.setZero(12, MODEL_DOF_VIRTUAL);
+                    rd_.e_task.setZero(12);
+                    rd_.J_task.block(0, 0, 6, MODEL_DOF_VIRTUAL) = rd_.link_local_[Left_Foot].jac;
+                    rd_.J_task.block(6, 0, 6, MODEL_DOF_VIRTUAL) = rd_.link_local_[Right_Foot].jac;
+                    rd_.e_task.segment<3>(0) = rd_.link_local_[Left_Foot].x_traj - rd_.link_local_[Left_Foot].xpos;
+                    rd_.e_task.segment<3>(3) = -DyrosMath::getPhi(rd_.link_local_[Left_Foot].rotm, Eigen::Matrix3d::Identity());
+                    rd_.e_task.segment<3>(6) = rd_.link_local_[Right_Foot].x_traj - rd_.link_local_[Right_Foot].xpos;
+                    rd_.e_task.segment<3>(9) = -DyrosMath::getPhi(rd_.link_local_[Right_Foot].rotm, Eigen::Matrix3d::Identity());
+
+                    Eigen::MatrixXd J_task_joint = rd_.J_task.rightCols(MODEL_DOF);
+                    Eigen::VectorXd q_delta_joint = DyrosMath::pinv_SVD(J_task_joint) * rd_.e_task;
+                    rd_.q_desired += q_delta_joint / 1000.0;
+
+                    for (int i = 0; i < MODEL_DOF; i++) {
+                        rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                    }
+
+                    if(!dc_.simMode){
+                        rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);
+                    }
                 }
                 else if (dc_.task_cmd_.task_mode == 4)  // IK MODE (CONTACT)
                 {
@@ -296,7 +349,7 @@ void *P73Controller::TaskCtrlThread()
                     }
 
                     rd_.link_[Pelvis].x_desired = rd_.link_[Pelvis].x_init;
-                    rd_.link_[Pelvis].x_desired(2) += -0.2;
+                    rd_.link_[Pelvis].x_desired(2) += -0.1;
                     rd_.link_[Pelvis].SetTrajectoryQuintic(rd_.control_time_, time_init, time_init + 3.0, rd_.link_[Pelvis].x_init, rd_.link_[Pelvis].x_desired);
 
                     rd_.J_task.setZero(6, MODEL_DOF_VIRTUAL);
