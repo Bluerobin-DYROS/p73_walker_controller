@@ -1,55 +1,19 @@
 #include "p73_controller/p73_controller.h"
 using namespace std;
 
+std::filesystem::path data_dir = "/home/bluerobin/ros2_ws/src/data/";
+
+ofstream joint_desired_log(data_dir / "joint_desired_log.txt");
+ofstream joint_position_log(data_dir / "joint_position_log.txt");
+ofstream joint_velocity_log(data_dir / "joint_velocity_log.txt");
+ofstream torque_sum_log(data_dir / "torque_sum_log.txt");
+
 P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     : stm_(stm), dc_(stm.dc_), rd_(stm.dc_.rd_), node_(node)
     #ifdef COMPILE_P73_CC
     , cc_(*new CustomController(dc_, rd_))
     #endif
 {
-    //--- PD Gain
-    node_->declare_parameter<std::vector<double>>("Kp_j", std::vector<double>(MODEL_DOF, 0.0));
-    node_->declare_parameter<std::vector<double>>("Kd_j", std::vector<double>(MODEL_DOF, 0.0));
-    node_->get_parameter("Kp_j", rd_.Kp_j);
-    node_->get_parameter("Kd_j", rd_.Kd_j);
-
-    std::cout << "Kp_j: " << " (size=" << rd_.Kp_j.size() << "): ";
-    for (const auto &param : rd_.Kp_j)
-        std::cout << std::fixed << std::setprecision(3) << param << " ";
-    std::cout << std::endl;
-    std::cout << "Kd_j: " << " (size=" << rd_.Kd_j.size() << "): ";
-    for (const auto &param : rd_.Kd_j)
-        std::cout << std::fixed << std::setprecision(3) << param << " ";
-    std::cout << std::endl;
-
-    node_->declare_parameter<std::vector<double>>("Kp_m", std::vector<double>(MODEL_DOF, 0.0));
-    node_->declare_parameter<std::vector<double>>("Kd_m", std::vector<double>(MODEL_DOF, 0.0));
-    node_->get_parameter("Kp_m", rd_.Kp_m);
-    node_->get_parameter("Kd_m", rd_.Kd_m);
-
-    std::cout << "Kp_m: " << " (size=" << rd_.Kp_m.size() << "): ";
-    for (const auto &param : rd_.Kp_j)
-        std::cout << std::fixed << std::setprecision(3) << param << " ";
-    std::cout << std::endl;
-    std::cout << "Kd_m: " << " (size=" << rd_.Kd_m.size() << "): ";
-    for (const auto &param : rd_.Kd_j)
-        std::cout << std::fixed << std::setprecision(3) << param << " ";
-    std::cout << std::endl;
-
-    node_->declare_parameter<std::vector<double>>("tau_coulomb", std::vector<double>(MODEL_DOF, 0.0));
-    node_->declare_parameter<std::vector<double>>("tau_viscous", std::vector<double>(MODEL_DOF, 0.0));
-    node_->get_parameter("tau_coulomb", rd_.tau_coulomb);
-    node_->get_parameter("tau_viscous", rd_.tau_viscous);
-
-    std::cout << "tau_coulomb: " << " (size=" << rd_.tau_coulomb.size() << "): ";
-    for (const auto &param : rd_.tau_coulomb)
-        std::cout << std::fixed << std::setprecision(3) << param << " ";
-    std::cout << std::endl;
-    std::cout << "tau_viscous: " << " (size=" << rd_.tau_viscous.size() << "): ";
-    for (const auto &param : rd_.tau_viscous)
-        std::cout << std::fixed << std::setprecision(3) << param << " ";
-    std::cout << std::endl;
-
     // Create callback group for p73 controller
     cbg_p73_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
@@ -93,7 +57,7 @@ void *P73Controller::TaskCtrlThread()
 
             static VectorQd zero_m = VectorQd::Zero();
             WBC::ContactCalcDefault(rd_);
-            WBC::FrictionCompensationTorques(rd_);
+            // WBC::FrictionCompensationTorques(rd_);
 
             // pause switch
             if (dc_.pauseSwitch)
@@ -139,7 +103,7 @@ void *P73Controller::TaskCtrlThread()
                     static Eigen::VectorQd q_init_ = Eigen::VectorQd::Zero();
                     static Eigen::VectorQd q_init_motor_ = Eigen::VectorQd::Zero();
 
-                    const int sinusoid_joint_target_ = 0;
+                    const int sinusoid_joint_target_ = 4;
                     const double sinusoid_joint_min_ = 0.1;
                     const double sinusoid_joint_max_ = 0.1;
                     const double sinusoid_period_ = 3.0;
@@ -233,6 +197,7 @@ void *P73Controller::TaskCtrlThread()
                         if(!dc_.simMode)
                         {
                             torque_motor = rd_.four_bar_Jaco_.transpose() * torque_joint;
+
                             rd_.torque_desired(4) = torque_motor(4);
                             rd_.torque_desired(5) = torque_motor(5);
                         }
@@ -262,10 +227,10 @@ void *P73Controller::TaskCtrlThread()
                         }
                     }
 
-                    // joint_desired_log << rd_.q_desired(sinusoid_joint_target_) << std::endl;
-                    // joint_position_log << rd_.q_(sinusoid_joint_target_) << std::endl;
-                    // joint_velocity_log << rd_.q_dot_(sinusoid_joint_target_) << std::endl;
-                    // torque_sum_log << rd_.torque_desired.head(12).transpose() << std::endl;
+                    joint_desired_log << rd_.q_desired(sinusoid_joint_target_) << std::endl;
+                    joint_position_log << rd_.q_(sinusoid_joint_target_) << std::endl;
+                    joint_velocity_log << rd_.q_dot_(sinusoid_joint_target_) << std::endl;
+                    torque_sum_log << rd_.torque_desired.head(12).transpose() << std::endl;
                 }
                 else if (dc_.task_cmd_.task_mode == 1)  // FRICTION COMPENSATION MODE
                 {

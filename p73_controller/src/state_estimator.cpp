@@ -1,4 +1,5 @@
 #include "p73_controller/state_estimator.h"
+#include <iomanip>
 
 StateEstimator::StateEstimator(DataContainer &dc)
     : dc_(dc), rd_global_(dc.rd_)
@@ -149,15 +150,86 @@ StateEstimator::StateEstimator(DataContainer &dc)
 
     imu_pose_pub_ = dc_.node_->create_publisher<geometry_msgs::msg::Pose>("p73/imuPose", 10);
 
+
+
+
+    
     // =============================
     // Parameter Loader
     // =============================
     //--- Motor inertia
     dc_.node_->declare_parameter<std::vector<double>>("motor_armature", std::vector<double>(MODEL_DOF, 0.0));
     dc_.node_->get_parameter("motor_armature", motor_armature);
-    joint_armature.resize(motor_armature.size());
     std::cout << "motor_armature: " << " (size=" << motor_armature.size() << "): ";
     for (const auto &param : motor_armature)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+
+    //--- Joint inertia
+    dc_.node_->declare_parameter<std::vector<double>>("joint_armature", std::vector<double>(MODEL_DOF, 0.0));
+    dc_.node_->get_parameter("joint_armature", joint_armature);
+    std::cout << "joint_armature: " << " (size=" << joint_armature.size() << "): ";
+    for (const auto &param : joint_armature)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+
+    //--- Nautral frequency
+    dc_.node_->declare_parameter<std::vector<double>>("wn", std::vector<double>(MODEL_DOF, 0.0));
+    dc_.node_->get_parameter("wn", wn);
+    wnwn.resize(wn.size());
+    for(int i = 0; i < MODEL_DOF; i++){
+        wnwn[i] = wn[i] * wn[i];    
+    }
+    std::cout << "natural freq: " << " (size=" << wn.size() << "): ";
+    for (const auto &param : wn)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+
+    //--- Motor PD Gain
+    dc_.node_->declare_parameter<std::vector<double>>("Kp_m", std::vector<double>(MODEL_DOF, 0.0));
+    dc_.node_->declare_parameter<std::vector<double>>("Kd_m", std::vector<double>(MODEL_DOF, 0.0));
+    dc_.node_->get_parameter("Kp_m", rd_global_.Kp_m);
+    dc_.node_->get_parameter("Kd_m", rd_global_.Kd_m);
+
+    std::cout << "Kp_m: " << " (size=" << rd_global_.Kp_m.size() << "): ";
+    for (const auto &param : rd_global_.Kp_m)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+    std::cout << "Kd_m: " << " (size=" << rd_global_.Kd_m.size() << "): ";
+    for (const auto &param : rd_global_.Kd_m)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+
+    //--- Joint PD Gain
+    rd_global_.Kp_j.resize(rd_global_.Kp_m.size());
+    rd_global_.Kd_j.resize(rd_global_.Kd_m.size());
+
+    for(int i = 0; i < MODEL_DOF; i++){
+        rd_global_.Kp_j[i] =     joint_armature[i] * wnwn[i];
+        rd_global_.Kd_j[i] = 2 * joint_armature[i] * wn[i];
+    }
+
+    std::cout << "Kp_j: " << " (size=" << rd_global_.Kp_j.size() << "): ";
+    for (const auto &param : rd_global_.Kp_j)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+    std::cout << "Kd_j: " << " (size=" << rd_global_.Kd_j.size() << "): ";
+    for (const auto &param : rd_global_.Kd_j)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+
+    //--- Friction Parameter
+    dc_.node_->declare_parameter<std::vector<double>>("tau_coulomb", std::vector<double>(MODEL_DOF, 0.0));
+    dc_.node_->declare_parameter<std::vector<double>>("tau_viscous", std::vector<double>(MODEL_DOF, 0.0));
+    dc_.node_->get_parameter("tau_coulomb", rd_global_.tau_coulomb);
+    dc_.node_->get_parameter("tau_viscous", rd_global_.tau_viscous);
+
+    std::cout << "tau_coulomb: " << " (size=" << rd_global_.tau_coulomb.size() << "): ";
+    for (const auto &param : rd_global_.tau_coulomb)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+    std::cout << "tau_viscous: " << " (size=" << rd_global_.tau_viscous.size() << "): ";
+    for (const auto &param : rd_global_.tau_viscous)
         std::cout << std::fixed << std::setprecision(3) << param << " ";
     std::cout << std::endl;
 
@@ -219,8 +291,8 @@ void *StateEstimator::StateEstimatorThread()
 
         if ((d0 + d1 + d2 + d3) > 1000)
         {
-            // if (control_time_ > 0.1)
-            //     printf(" STATE : %7.1f stm over 1000, d0 : %ld, d1 : %ld, d2 : %ld, d3 : %ld\n", control_time_, d0, d1, d2, d3);
+            if (control_time_ > 0.1)
+                printf(" STATE : %7.1f stm over 1000, d0 : %ld, d1 : %ld, d2 : %ld, d3 : %ld\n", control_time_, d0, d1, d2, d3);
         }
         
         // Sleep to maintain loop rate
@@ -288,6 +360,24 @@ void StateEstimator::GetRobotData()
             four_bar_Jaco_ = four_bar_kinematics_.getFourBarJaco();
             four_bar_Jaco_inv_ = four_bar_Jaco_.inverse();
         }                  
+
+        //---Joint armature
+        // Eigen::MatrixQQd motor_armature_matrix; motor_armature_matrix.setZero();
+        // Eigen::MatrixQQd joint_armature_matrix; joint_armature_matrix.setZero();
+        // motor_armature_matrix.diagonal() = Eigen::VectorXd::Map(motor_armature.data(), motor_armature.size());
+        // joint_armature_matrix = four_bar_Jaco_.transpose() * motor_armature_matrix * four_bar_Jaco_; 
+        // for(int i = 0; i < MODEL_DOF; i++){
+        //     joint_armature[i] = joint_armature_matrix(i, i);
+        // }
+
+        // std::cout << "===== INFO =====" << std::endl;
+        // std::cout << "joint_armature: " << std::endl;
+        // std::cout << std::fixed << std::setprecision(5);
+        // for(int i = 0; i < MODEL_DOF; i++){
+        //     std::cout << joint_armature[i] << std::endl;
+        // }
+        // std::cout << std::defaultfloat;
+        // std::cout << " " << std::endl;
 
         q_virtual_local_.segment(7, MODEL_DOF) = q_;
         q_dot_virtual_local_.segment(6, MODEL_DOF) = q_dot_;  

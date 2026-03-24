@@ -94,11 +94,11 @@ void FourBarKinematics::Motor2JointPosVel(const Eigen::VectorQd &motor_pos,
         q_motor_iter_calc_ = q_motor_iter_calc_ + q_dot_calc * update_iteration_dt * DEG2RAD;
     }
 
-    CalculateJacobians(q_iter_calc_, q_motor_iter_calc_,
-                       Lankle_Jaco, Rankle_Jaco,
-                       Lknee_Jaco, Rknee_Jaco,
-                       Lankle_Jaco_inv, Rankle_Jaco_inv,
-                       Lknee_Jaco_inv, Rknee_Jaco_inv);
+    // CalculateJacobians(q_iter_calc_, motor_pos,
+    //                    Lankle_Jaco, Rankle_Jaco,
+    //                    Lknee_Jaco, Rknee_Jaco,
+    //                    Lankle_Jaco_inv, Rankle_Jaco_inv,
+    //                    Lknee_Jaco_inv, Rknee_Jaco_inv);
 
     joint_pos = motor_pos;
     joint_pos.segment(3, 1) = q_iter_calc_.segment(3, 1);
