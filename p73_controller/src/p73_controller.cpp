@@ -235,6 +235,96 @@ void *P73Controller::TaskCtrlThread()
                 }
                 else if (dc_.task_cmd_.task_mode == 1)  // FRICTION COMPENSATION MODE
                 {
+                    rd_.torque_desired.setZero();
+
+                    static bool is_pd_tune_init = true;
+
+                    static Eigen::VectorQd q_init_ = Eigen::VectorQd::Zero();
+                    static Eigen::VectorQd q_init_motor_ = Eigen::VectorQd::Zero();
+
+                    const int friction_joint_target_ = 5;
+
+                    if (is_pd_tune_init == true)
+                    {
+                        q_init_ = rd_.q_;
+                        q_init_motor_ = rd_.q_motor_;
+
+
+                        std::cout << "==================================" << std::endl;
+                        std::cout << "========== PD TUNE Mode ==========" << std::endl;
+                        std::cout << "TARGET JOINT : " << friction_joint_target_ << std::endl;
+                        std::cout << "==================================" << std::endl;
+                        is_pd_tune_init = false;
+                    }
+
+                    rd_.q_desired = q_init_;
+
+                    //--- Sinusoidal Joint Trajectory
+                    if(!dc_.simMode){
+                        for(int i = 0; i < MODEL_DOF; i++)
+                        {
+                            rd_.torque_desired(i) = (rd_.Kp_m[i]) * (q_init_motor_[i] - rd_.q_motor_[i]) + rd_.Kd_m[i] * (0.0 - rd_.q_dot_motor_(i));
+                        }
+                    }
+                    else{
+                        for(int i = 0; i < MODEL_DOF; i++)
+                        {
+                            rd_.torque_desired(i) = (rd_.Kp_j[i]) * (q_init_[i] - rd_.q_[i]) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                        }
+                    }
+
+                    Eigen::VectorQd torque_joint; torque_joint.setZero();
+                    Eigen::VectorQd torque_motor; torque_motor.setZero();
+
+                    WBC::FrictionCompensationTorques(rd_, rd_.q_dot_);
+                    torque_joint = rd_.torque_fric;
+
+                    // ================================
+                    if(friction_joint_target_ == 0 || friction_joint_target_ == 1 || friction_joint_target_ == 2 || friction_joint_target_ == 3 ||
+                       friction_joint_target_ == 6 || friction_joint_target_ == 7 || friction_joint_target_ == 8 || friction_joint_target_ == 9 ||
+                       friction_joint_target_ == 12)
+                    {
+                        if(!dc_.simMode)
+                        {
+                            torque_motor = rd_.four_bar_Jaco_.transpose() * torque_joint;
+                        }
+                        else
+                        {
+                            torque_motor = torque_joint;
+                        }
+
+                        rd_.torque_desired(friction_joint_target_) = torque_motor(friction_joint_target_);
+                    }
+                    else if(friction_joint_target_ == 4 || friction_joint_target_ == 5)
+                    {
+                        if(!dc_.simMode)
+                        {
+                            torque_motor = rd_.four_bar_Jaco_.transpose() * torque_joint;
+
+                            rd_.torque_desired(4) = torque_motor(4);
+                            rd_.torque_desired(5) = torque_motor(5);
+                        }
+                        else
+                        {
+                            torque_motor = torque_joint;
+                            rd_.torque_desired(friction_joint_target_) = torque_motor(friction_joint_target_);
+                        }
+                    }
+                    else if(friction_joint_target_ == 10 || friction_joint_target_ == 11)
+                    {
+                        if(!dc_.simMode)
+                        {
+                            torque_motor = rd_.four_bar_Jaco_.transpose() * torque_joint;
+
+                            rd_.torque_desired(10) = torque_motor(10);
+                            rd_.torque_desired(11) = torque_motor(11);
+                        }
+                        else
+                        {
+                            torque_motor = torque_joint;
+                            rd_.torque_desired(friction_joint_target_) = torque_motor(friction_joint_target_);
+                        }
+                    }
 
                 }
                 else if (dc_.task_cmd_.task_mode == 2)  // SIMPLE JOINT MOTION MODE

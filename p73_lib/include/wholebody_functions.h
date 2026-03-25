@@ -21,6 +21,7 @@ namespace WBC
     VectorQd GravityCompensationTorque(RobotEigenData &rd_);
     VectorQd ContactForceFrictionConeConstraintTorque(RobotEigenData &rd_, Eigen::VectorQd command_torque);
     void FrictionCompensationTorques(RobotEigenData& rd_);
+    void FrictionCompensationTorques(RobotEigenData& rd_, const Eigen::VectorQd &q_dot);
 
     //---Whole-body Inverse Kinematics Controller
     void NullspaceInverseKinematics(RobotEigenData &rd_);

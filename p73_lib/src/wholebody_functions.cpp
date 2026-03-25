@@ -166,15 +166,15 @@ namespace WBC
         rd_.q_desired = rd_.q_ + q_delta.tail(MODEL_DOF);
     }
 
-    void FrictionCompensationTorques(RobotEigenData& rd_)
+    void FrictionCompensationTorques(RobotEigenData& rd_, const Eigen::VectorQd &q_dot)
     {
         double alpha_fric = 0.95;
         Eigen::VectorQd torque_coulomb;
         Eigen::VectorQd torque_viscous;
 
         for(int i = 0; i < MODEL_DOF; i++){
-            torque_coulomb(i) = rd_.tau_coulomb[i] * tanh(alpha_fric * rd_.q_dot_motor_(i)); 
-            torque_viscous(i) = rd_.tau_viscous[i] * tanh(alpha_fric * rd_.q_dot_motor_(i)) * sqrt(abs(rd_.q_dot_motor_(i))); 
+            torque_coulomb(i) = rd_.tau_coulomb[i] * tanh(alpha_fric * q_dot(i)); 
+            torque_viscous(i) = rd_.tau_viscous[i] * tanh(alpha_fric * q_dot(i)) * sqrt(abs(q_dot(i))); 
         }
 
         rd_.torque_fric = torque_coulomb + torque_viscous;
