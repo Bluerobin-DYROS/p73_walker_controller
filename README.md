@@ -33,3 +33,9 @@ cmake ..
 make
 sudo make install
 ```
+
+## 5. TODO
+
+1. ADD CLIK
+2. UPDATE README
+3. CHANGE GUI

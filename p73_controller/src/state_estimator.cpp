@@ -289,12 +289,15 @@ void *StateEstimator::StateEstimatorThread()
         SendCommand();
         auto d3 = chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - t3).count();
 
-        if ((d0 + d1 + d2 + d3) > 1000)
+        if (!dc_.simMode)
         {
-            if (control_time_ > 0.1)
-                printf(" STATE : %7.1f stm over 1000, d0 : %ld, d1 : %ld, d2 : %ld, d3 : %ld\n", control_time_, d0, d1, d2, d3);
+
+            if ((d0 + d1 + d2 + d3) > 1000)
+            {
+                if (control_time_ > 0.1)
+                    printf(" STATE : %7.1f stm over 1000, d0 : %ld, d1 : %ld, d2 : %ld, d3 : %ld\n", control_time_, d0, d1, d2, d3);
+            }
         }
-        
         // Sleep to maintain loop rate
         auto loop_end = std::chrono::steady_clock::now();
         auto loop_duration = std::chrono::duration_cast<std::chrono::microseconds>(loop_end - loop_start).count();
@@ -685,11 +688,11 @@ void StateEstimator::StoreState(RobotEigenData &rd_global_)
 
     for (int i = 0; i < (LINK_NUMBER + 1); i++)
     {
-        memcpy(&rd_global_.link_local_[i].jac,  &link_[i].jac, sizeof(Matrix6Vd));
-        memcpy(&rd_global_.link_local_[i].xpos, &link_[i].xpos, sizeof(Vector3d));
-        memcpy(&rd_global_.link_local_[i].rotm, &link_[i].rotm, sizeof(Matrix3d));
-        memcpy(&rd_global_.link_local_[i].v,    &link_[i].v, sizeof(Vector3d));
-        memcpy(&rd_global_.link_local_[i].w,    &link_[i].w, sizeof(Vector3d));
+        memcpy(&rd_global_.link_local_[i].jac,  &link_local_[i].jac, sizeof(Matrix6Vd));
+        memcpy(&rd_global_.link_local_[i].xpos, &link_local_[i].xpos, sizeof(Vector3d));
+        memcpy(&rd_global_.link_local_[i].rotm, &link_local_[i].rotm, sizeof(Matrix3d));
+        memcpy(&rd_global_.link_local_[i].v,    &link_local_[i].v, sizeof(Vector3d));
+        memcpy(&rd_global_.link_local_[i].w,    &link_local_[i].w, sizeof(Vector3d));
     }
 
     memcpy(&rd_global_.q_, &q_, sizeof(VectorQd));
