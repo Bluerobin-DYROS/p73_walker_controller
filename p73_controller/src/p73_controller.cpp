@@ -242,7 +242,7 @@ void *P73Controller::TaskCtrlThread()
                     static Eigen::VectorQd q_init_ = Eigen::VectorQd::Zero();
                     static Eigen::VectorQd q_init_motor_ = Eigen::VectorQd::Zero();
 
-                    const int friction_joint_target_ = 5;
+                    const int friction_joint_target_ = 12;
 
                     if (is_pd_tune_init == true)
                     {
@@ -367,22 +367,31 @@ void *P73Controller::TaskCtrlThread()
                     rd_.link_local_[Right_Foot].x_traj(0) += circle_radius * (std::cos(phase_right) - std::cos(phase_right_0));
                     rd_.link_local_[Right_Foot].x_traj(2) += circle_radius * (std::sin(phase_right) - std::sin(phase_right_0));
 
-                    rd_.J_task.setZero(12, MODEL_DOF_VIRTUAL);
-                    rd_.e_task.setZero(12);
-                    rd_.J_task.block(0, 0, 6, MODEL_DOF_VIRTUAL) = rd_.link_local_[Left_Foot].jac;
-                    rd_.J_task.block(6, 0, 6, MODEL_DOF_VIRTUAL) = rd_.link_local_[Right_Foot].jac;
-                    rd_.e_task.segment<3>(0) = rd_.link_local_[Left_Foot].x_traj - rd_.link_local_[Left_Foot].xpos;
-                    rd_.e_task.segment<3>(3) = -DyrosMath::getPhi(rd_.link_local_[Left_Foot].rotm, Eigen::Matrix3d::Identity());
-                    rd_.e_task.segment<3>(6) = rd_.link_local_[Right_Foot].x_traj - rd_.link_local_[Right_Foot].xpos;
-                    rd_.e_task.segment<3>(9) = -DyrosMath::getPhi(rd_.link_local_[Right_Foot].rotm, Eigen::Matrix3d::Identity());
+                    // rd_.J_task.setZero(12, MODEL_DOF);
+                    // rd_.e_task.setZero(12);
+                    // rd_.J_task.block(0, 0, 6, MODEL_DOF) = rd_.link_local_[Left_Foot].jac.rightCols(MODEL_DOF);
+                    // rd_.J_task.block(6, 0, 6, MODEL_DOF) = rd_.link_local_[Right_Foot].jac.rightCols(MODEL_DOF);
+                    // rd_.e_task.segment<3>(0) = rd_.link_local_[Left_Foot].x_traj - rd_.link_local_[Left_Foot].xpos;
+                    // rd_.e_task.segment<3>(3) = -DyrosMath::getPhi(rd_.link_local_[Left_Foot].rotm, Eigen::Matrix3d::Identity());
+                    // rd_.e_task.segment<3>(6) = rd_.link_local_[Right_Foot].x_traj - rd_.link_local_[Right_Foot].xpos;
+                    // rd_.e_task.segment<3>(9) = -DyrosMath::getPhi(rd_.link_local_[Right_Foot].rotm, Eigen::Matrix3d::Identity());
 
-                    Eigen::MatrixXd J_task_joint = rd_.J_task.rightCols(MODEL_DOF);
+                    rd_.J_task.setZero(6, MODEL_DOF);
+                    rd_.e_task.setZero(6);
+                    rd_.J_task.block(0, 0, 3, MODEL_DOF) = rd_.link_local_[Left_Foot].jac.rightCols(MODEL_DOF).topRows(3);
+                    rd_.J_task.block(3, 0, 3, MODEL_DOF) = rd_.link_local_[Right_Foot].jac.rightCols(MODEL_DOF).topRows(3);
+                    rd_.e_task.segment<3>(0) = 10.0 * (rd_.link_local_[Left_Foot].x_traj - rd_.link_local_[Left_Foot].xpos);
+                    rd_.e_task.segment<3>(3) = 10.0 * (rd_.link_local_[Right_Foot].x_traj - rd_.link_local_[Right_Foot].xpos);
+
+                    Eigen::MatrixXd J_task_joint = rd_.J_task;
                     Eigen::VectorXd q_delta_joint = DyrosMath::pinv_SVD(J_task_joint) * rd_.e_task;
                     rd_.q_desired += q_delta_joint / 1000.0;
 
                     for (int i = 0; i < MODEL_DOF; i++) {
                         rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
                     }
+
+                    torque_sum_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_.transpose() << std::endl;
 
                     if(!dc_.simMode){
                         rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);

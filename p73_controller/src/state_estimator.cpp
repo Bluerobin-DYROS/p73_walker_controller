@@ -352,13 +352,15 @@ void StateEstimator::GetRobotData()
                 const int actuator_idx = P73::ELMO_2_JOINT[i];
                 q_motor_(i) = robot_data.joint.position_external[actuator_idx];
                 q_dot_motor_(i) = robot_data.joint.velocity[actuator_idx];
-                q_torque_(i) = robot_data.joint.torque[actuator_idx];
+                q_torque_motor_(i) = robot_data.joint.torque[actuator_idx];
                 elmo_state[i] = getElmoState(robot_data.joint.status_word[actuator_idx]);
             }
 
             four_bar_kinematics_.Motor2JointPosVel(q_motor_, q_, q_dot_motor_, q_dot_);
             four_bar_Jaco_ = four_bar_kinematics_.getFourBarJaco();
             four_bar_Jaco_inv_ = four_bar_Jaco_.inverse();
+
+            q_torque_ = four_bar_Jaco_.transpose().inverse() * q_torque_motor_;
         }                  
 
         //---Joint armature
@@ -448,7 +450,10 @@ void StateEstimator::InitYaw()
     }
 
     tf2::Quaternion q_mod;
-    rd_.yaw = rd_.yaw - rd_.yaw_init;
+    // rd_.yaw = rd_.yaw - rd_.yaw_init;
+    rd_.roll = 0.0;
+    rd_.pitch = 0.0;
+    rd_.yaw = 0.0;
     q_mod.setRPY(rd_.roll, rd_.pitch, rd_.yaw);
 
     q_virtual_local_(3) = q_mod.getX();

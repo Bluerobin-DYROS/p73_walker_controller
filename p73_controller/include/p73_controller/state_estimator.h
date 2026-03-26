@@ -52,7 +52,7 @@ public:
     VectorQd q_, q_dot_, q_torque_;
     VectorQd q_dot_lpf_;
     // motor position and velocity from elmo
-    VectorQd q_motor_, q_dot_motor_;
+    VectorQd q_motor_, q_dot_motor_, q_torque_motor_;
     // joint + motor position and velocity
     Matrix<rScalar, MODEL_DOF+8, 1> q_4bar_, q_dot_4bar_;
     MatrixQQd four_bar_Jaco_, four_bar_Jaco_inv_;
