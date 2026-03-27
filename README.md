@@ -1,7 +1,7 @@
 # p73_walker_controller
 
 ![P73_IMAGE](./p73.png)
-## 1. Purpose
+## 0. Purpose
 `p73_walker_controller` is a ROS 2 control stack for the P73 humanoid walker in both simulation and real hardware modes.
 
 Main goals:
@@ -10,8 +10,83 @@ Main goals:
 - Publish standardized robot-state topics for GUI, logging, and external modules.
 - Support the same control interface across MuJoCo simulation and real robot execution.
 
-## 2. Robot states
-Robot states are stored in `RobotEigenData` (inside `DataContainer::rd_`) defined in `p73_lib/include/p73_lib/robot_data.h`.
+## 1. Installation Guide
+
+### 1.1. Clone the repository
+```sh
+mkdir ~/ros2_ws
+cd ~/ros2_ws/src
+git clone https://github.com/Bluerobin-DYROS/p73_walker_controller.git
+```
+
+### 1.2. CustomController (optional)
+```sh
+cd ~/ros2_ws/src
+git clone https://github.com/Bluerobin-DYROS/p73_cc.git
+```
+
+### 1.3. GUI
+```sh
+sudo apt install qtbase5-private-dev libqt5x11extras5*
+cd ~/ros2_ws/src
+git clone https://github.com/Bluerobin-DYROS/p73_walker_gui.git
+```
+
+### 1.4. Simulator
+```sh
+cd ~/ros2_ws/src
+git clone https://github.com/Bluerobin-DYROS/mujoco_ros2_sim.git
+```
+
+### 1.5 br_driver
+```
+git clone https://github.com/Bluerobin-DYROS/p73_sys_ws.git
+cd p73_sys_ws
+git submodule update --init --recursive
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+sudo make install
+```
+
+### 1.6 External Libraries
+
+#### Pinocchio
+```
+sudo apt install ros-jazzy-pinocchio
+```
+
+#### OSQP
+```
+cd ~/Downloads
+git clone https://github.com/osqp/osqp
+cd osqp
+mkdir build && cd build
+cmake -G "Unix Makefiles" ..
+make
+sudo make install
+```
+#### OSQP-Eigen
+```
+cd ~/Downloads
+git clone https://github.com/robotology/osqp-eigen.git
+cd osqp-eigen
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+#### Etc
+```
+sudo apt update
+sudo apt install -y libglfw3-dev
+sudo apt install -y libncurses-dev
+```
+
+## 2. Robot States
+Robot states are stored in `RobotEigenData` (inside `DataContainer::rd_`), defined in `p73_lib/include/p73_lib/robot_data.h`.
 
 ### 2.1 Time and model data
 - `control_time_`, `control_time_us_`: control loop timestamp.
@@ -22,7 +97,7 @@ Robot states are stored in `RobotEigenData` (inside `DataContainer::rd_`) define
 - `q_`, `q_dot_`, `q_torque_`: joint position, velocity, measured torque.
 - `q_motor_`, `q_dot_motor_`, `q_torque_motor_`: motor-side position, velocity, and torque. These are only available on the real robot.
 - `q_dot_lpf_`: filtered joint velocity.
-- `q_virtual_`, `q_dot_virtual_`: floating-base generalized coordinates/velocity.
+- `q_virtual_`, `q_dot_virtual_`: floating-base generalized coordinates and velocities.
 
 ### 2.3 IMU and base orientation states
 - `imu_ang_vel`, `imu_lin_acc`: IMU angular velocity and linear acceleration.
@@ -51,50 +126,6 @@ if (!dc_.simMode) {
 ```
 ---
 
-## 3. Prerequisites
-### 3.1 Pinocchio
-```
-sudo apt install ros-jazzy-pinocchio
-```
-### 3.2 br_driver
-```
-git clone https://github.com/Bluerobin-DYROS/p73_sys_ws.git
-cd p73_sys_ws
-git submodule update --init --recursive
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc)
-sudo make install
-```
-### 3.3 OSQP
-```
-cd ~/Downloads
-git clone https://github.com/osqp/osqp
-cd osqp
-mkdir build && cd build
-cmake -G "Unix Makefiles" ..
-make
-sudo make install
-```
-### 3.4 OSQP-Eigen
-```
-cd ~/Downloads
-git clone https://github.com/robotology/osqp-eigen.git
-cd osqp-eigen
-mkdir build
-cd build
-cmake ..
-make
-sudo make install
-```
+## TODO
 
-### 3.5 etc
-```
-sudo apt update
-sudo apt install -y libglfw3-dev
-sudo apt install -y libncurses-dev
-```
-
-## 4. TODO
-
-1. CHANGE GUI FOR P73_WALKER
+1. UPDATE THE GUI FOR P73_WALKER
