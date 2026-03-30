@@ -417,6 +417,18 @@ namespace DyrosMath
     return result;
   }
 
+  static Eigen::Vector3d quatRotateInverse(const Eigen::Quaterniond& q, const Eigen::Vector3d& v) {
+
+    Eigen::Vector3d q_vec = q.vec();
+    double q_w = q.w();
+
+    Eigen::Vector3d a = v * (2.0 * q_w * q_w - 1.0);
+    Eigen::Vector3d b = 2.0 * q_w * q_vec.cross(v);
+    Eigen::Vector3d c = 2.0 * q_vec * q_vec.dot(v);
+
+    return a - b + c;
+  }
+
   static Eigen::Matrix3d Add_vel_to_Rotm(Eigen::Matrix3d Rotm, Eigen::Vector3d Rot_Vel, double d_time_)
   {
     Eigen::Quaterniond qtemp(Rotm);

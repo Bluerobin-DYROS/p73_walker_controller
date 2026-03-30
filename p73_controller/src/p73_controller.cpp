@@ -11,7 +11,7 @@ ofstream torque_sum_log(data_dir / "torque_sum_log.txt");
 
 P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     : stm_(stm), dc_(stm.dc_), rd_(stm.dc_.rd_), node_(node)
-    #ifdef COMPILE_P73_CC
+    #ifdef COMPILE_CC
     , cc_(*new CustomController(dc_, rd_))
     #endif
 {
@@ -513,8 +513,8 @@ void *P73Controller::TaskCtrlThread()
                         rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);
                     }
                 }
-#ifdef COMPILE_P73_CC
-                if (dc_.task_cmd_.task_mode >= 5 && dc_.task_cmd_.task_mode < 10)
+#ifdef COMPILE_CC
+                else if (dc_.task_cmd_.task_mode >= 5 && dc_.task_cmd_.task_mode < 10)
                 {
                     try {
                         cc_.computeFast();

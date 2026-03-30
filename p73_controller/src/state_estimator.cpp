@@ -18,7 +18,7 @@ StateEstimator::StateEstimator(DataContainer &dc)
     model_local_ = model_;
     data_local_ = data_;  
 
-    bool pinocchio_model_checker = true;
+    bool pinocchio_model_checker = false;
 
     if (model_.nv == MODEL_DOF_VIRTUAL)
     {
@@ -230,6 +230,32 @@ StateEstimator::StateEstimator(DataContainer &dc)
     std::cout << std::endl;
     std::cout << "tau_viscous: " << " (size=" << rd_global_.tau_viscous.size() << "): ";
     for (const auto &param : rd_global_.tau_viscous)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+
+    //--- Joint limits
+    const Eigen::VectorXd q_lower = model_.lowerPositionLimit;
+    const Eigen::VectorXd q_upper = model_.upperPositionLimit;
+    const Eigen::VectorXd v_limit = model_.velocityLimit;
+    rd_global_.q_min.resize(MODEL_DOF);
+    rd_global_.q_max.resize(MODEL_DOF);
+    rd_global_.q_dot_max.resize(MODEL_DOF);
+    for (int i = 0; i < MODEL_DOF; ++i) {
+        rd_global_.q_min[i] = q_lower(7 + i);
+        rd_global_.q_max[i] = q_upper(7 + i);
+        rd_global_.q_dot_max[i] = v_limit(6 + i);
+    }
+
+    std::cout << "q_min: " << " (size=" << rd_global_.q_min.size() << "): ";
+    for (const auto &param : rd_global_.q_min)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+    std::cout << "q_max: " << " (size=" << rd_global_.q_max.size() << "): ";
+    for (const auto &param : rd_global_.q_max)
+        std::cout << std::fixed << std::setprecision(3) << param << " ";
+    std::cout << std::endl;
+    std::cout << "q_dot_max: " << " (size=" << rd_global_.q_dot_max.size() << "): ";
+    for (const auto &param : rd_global_.q_dot_max)
         std::cout << std::fixed << std::setprecision(3) << param << " ";
     std::cout << std::endl;
 
@@ -453,10 +479,17 @@ void StateEstimator::InitYaw()
     }
 
     tf2::Quaternion q_mod;
-    // rd_.yaw = rd_.yaw - rd_.yaw_init;
-    rd_.roll = 0.0;
-    rd_.pitch = 0.0;
-    rd_.yaw = 0.0;
+    if(dc_.simMode)
+    {
+        rd_.yaw = rd_.yaw - rd_.yaw_init;
+    }
+    else
+    {
+        // TILL FIX IMU
+        rd_.roll = 0.0;
+        rd_.pitch = 0.0;
+        rd_.yaw = 0.0;
+    }
     q_mod.setRPY(rd_.roll, rd_.pitch, rd_.yaw);
 
     q_virtual_local_(3) = q_mod.getX();
@@ -662,6 +695,11 @@ void StateEstimator::UpdateDynamics()
     A_inv_ = A_.inverse();
     C_ = pinocchio::computeCoriolisMatrix(model_, data_, q_virtual_, q_dot_virtual_); 
     G_ = pinocchio::computeGeneralizedGravity(model_, data_, q_virtual_);
+
+    pinocchio::computeCentroidalMomentum(model_, data_, q_virtual_, q_dot_virtual_);
+    centroidal_momentum_         = data_.hg.toVector();   // 6x1 = [angular; linear]
+    centroidal_angular_momentum_ = data_.hg.angular();    // 3x1
+    centroidal_linear_momentum_  = data_.hg.linear();     // 3x1
 }
 
 void StateEstimator::StoreState(RobotEigenData &rd_global_)
@@ -682,6 +720,10 @@ void StateEstimator::StoreState(RobotEigenData &rd_global_)
     memcpy(&rd_global_.A_inv_, &A_inv_, sizeof(MatrixVVd));
     memcpy(&rd_global_.C_,     &C_,     sizeof(MatrixVVd));
     memcpy(&rd_global_.G_,     &G_,     sizeof(VectorVQd));  
+
+    memcpy(&rd_global_.centroidal_momentum_, &centroidal_momentum_, sizeof(Eigen::Vector6d));
+    memcpy(&rd_global_.centroidal_angular_momentum_, &centroidal_angular_momentum_, sizeof(Eigen::Vector3d));
+    memcpy(&rd_global_.centroidal_linear_momentum_, &centroidal_linear_momentum_, sizeof(Eigen::Vector3d));
     
     memcpy(&rd_global_.four_bar_Jaco_, &four_bar_Jaco_, sizeof(MatrixQQd));  
     memcpy(&rd_global_.four_bar_Jaco_inv_, &four_bar_Jaco_inv_, sizeof(MatrixQQd));  
@@ -708,6 +750,7 @@ void StateEstimator::StoreState(RobotEigenData &rd_global_)
     rd_global_.yaw = rd_.yaw;
 
     rd_global_.control_time_ = control_time_;
+    rd_global_.control_time_us_ = static_cast<float>(control_time_ * 1.0e6);
 
     if (!rd_global_.firstCalc)
     {
@@ -880,7 +923,7 @@ void StateEstimator::GuiCmdCallback(const std_msgs::msg::String::SharedPtr msg)
             // dc_.inityawSwitch = true;
             dc_.stateEstimateModeSwitch = true;
             dc_.se_mode = true;
-            dc_.useMjcVirtual = false;
+            dc_.useMjcVirtual = true;
         }
     }
     else if (msg->data == "safetyReset") {

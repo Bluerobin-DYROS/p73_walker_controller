@@ -24,7 +24,7 @@ def generate_launch_description():
         raise FileNotFoundError(f"Model file not found: {model_file}")
     if not os.path.exists(urdf_path):
         raise FileNotFoundError(f"URDF file not found: {urdf_path}")
-
+    
     # MuJoCo ROS2 node
     mujoco_node = Node(
         package='mjc_ros2',
@@ -50,7 +50,7 @@ def generate_launch_description():
                 'xml_path': model_file,
                 'sim_mode': True
             },
-            setting_sim_PDgain_path
+            setting_sim_PDgain_path,
         ]
     )
 

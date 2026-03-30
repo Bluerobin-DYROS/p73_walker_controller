@@ -24,7 +24,7 @@ struct RobotEigenData
 {
     ~RobotEigenData() { cout << cred << "RobotEigenData terminate" << creset << endl; }
     std::atomic<float> control_time_;
-    std::atomic<int64_t> control_time_us_;
+    std::atomic<float> control_time_us_;
 
     pinocchio::Model model_;
     pinocchio::Data data_;
@@ -37,6 +37,10 @@ struct RobotEigenData
     /////////////////////////////////////
     MatrixVVd A_, A_inv_, C_;
     VectorVQd G_;
+
+    Eigen::Vector6d centroidal_momentum_;
+    Eigen::Vector3d centroidal_angular_momentum_;
+    Eigen::Vector3d centroidal_linear_momentum_;
 
     // CONTACT DYNAMICS
     MatrixXd J_C, J_C_INV_T;
@@ -73,6 +77,11 @@ struct RobotEigenData
 
     VectorQVQd q_virtual_;
     VectorVQd q_dot_virtual_;
+
+    // JOINT POSITION AND VELOCITY LIMITS
+    Eigen::VectorQd q_min;
+    Eigen::VectorQd q_max;
+    Eigen::VectorQd q_dot_max;
 
     // imu data
     Vector3d imu_ang_vel, imu_lin_acc;

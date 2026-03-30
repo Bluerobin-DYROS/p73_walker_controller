@@ -25,7 +25,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(p73_cc QUIET)
 IF(p73_cc_FOUND)
  message(" -- p73 custom based custom controller package found" )
-   ADD_DEFINITIONS(-DCOMPILE_P73_CC)
+   ADD_DEFINITIONS(-DCOMPILE_CC)
 ENDIF()
 
 include_directories(

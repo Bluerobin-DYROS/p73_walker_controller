@@ -83,6 +83,10 @@ public:
     MatrixVVd A_, A_inv_, C_;
     VectorVQd G_;
 
+    Eigen::Vector6d centroidal_momentum_;
+    Eigen::Vector3d centroidal_angular_momentum_;
+    Eigen::Vector3d centroidal_linear_momentum_;
+
     double torqOnTime = 0.0;
     double torqOffTime = 0.0;
     double torqRatio = 0.0;
