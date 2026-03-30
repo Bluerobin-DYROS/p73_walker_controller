@@ -129,3 +129,5 @@ if (!dc_.simMode) {
 ## TODO
 
 1. UPDATE THE GUI FOR P73_WALKER
+2. CHECK THE ACCURACY OF STATE ESTIMATION
+3. FIX IMU DRIFT -> In state estimation, delete the setting roll, pitch, and yaw values are zero.

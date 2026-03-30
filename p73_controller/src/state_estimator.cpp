@@ -564,12 +564,12 @@ void StateEstimator::StateEstimate()
         static Eigen::MatrixXd Q_;  Q_.setIdentity(num_state, num_state); 
         static Eigen::MatrixXd R_;  R_.setIdentity(num_observe, num_observe); 
         
-        double imuProcessNoisePosition_ = 0.1;
+        double imuProcessNoisePosition_ = 0.02;
         double imuProcessNoiseVelocity_ = 0.02;
         double footProcessNoisePosition_ = 0.002;
         
-        double footSensorNoisePosition_ = 0.001;
-        double footSensorNoiseVelocity_ = 0.2;
+        double footSensorNoisePosition_ = 0.5;
+        double footSensorNoiseVelocity_ = 0.1;
         double footHeightSensorNoise_ = 0.01;
 
         Q_.block(0, 0, 3, 3) *= imuProcessNoisePosition_;
@@ -591,6 +591,7 @@ void StateEstimator::StateEstimate()
             int rIndex1 = i1;
             int rIndex2 = dim_contacts + i1;
             int rIndex3 = 2 * dim_contacts + i;
+            // bool isContact = rd_global_.ee_[i].contact;
             bool isContact = rd_global_.ee_[i].contact;
 
             double high_suspect_number = 100.0;
@@ -633,6 +634,9 @@ void StateEstimator::StateEstimate()
             q_virtual_.segment(0, 3)     = x_hat_.segment(0, 3);
             q_dot_virtual_.segment(0, 3) = x_hat_.segment(3, 3);
         }
+
+        static ofstream log_file("/home/kwan/ros2_ws/src/p73_walker_controller/logging/data/state_estimate_log.txt");
+        log_file << x_hat_.segment(0, 6).transpose() << " " << q_virtual_mjc_.segment(0, 3).transpose() << " " << q_dot_virtual_mjc_.segment(0,3).transpose() << std::endl; 
     }
     else
     {
@@ -923,7 +927,7 @@ void StateEstimator::GuiCmdCallback(const std_msgs::msg::String::SharedPtr msg)
             // dc_.inityawSwitch = true;
             dc_.stateEstimateModeSwitch = true;
             dc_.se_mode = true;
-            dc_.useMjcVirtual = true;
+            dc_.useMjcVirtual = false;
         }
     }
     else if (msg->data == "safetyReset") {
