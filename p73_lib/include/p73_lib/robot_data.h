@@ -28,6 +28,8 @@ struct RobotEigenData
 
     pinocchio::Model model_;
     pinocchio::Data data_;
+    pinocchio::Model model_clik_;
+    pinocchio::Data data_clik_;
     LinkData link_[LINK_NUMBER + 1];
     LinkData link_local_[LINK_NUMBER + 1];
     EndEffector ee_[ENDEFFECTOR_NUMBER];

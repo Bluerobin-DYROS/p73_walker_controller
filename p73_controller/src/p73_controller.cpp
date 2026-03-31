@@ -1,14 +1,14 @@
 #include "p73_controller/p73_controller.h"
 using namespace std;
 
-std::filesystem::path data_dir = "/home/bluerobin/ros2_ws/src/p73_walker_controller/logging/data/";
+std::filesystem::path data_dir;
 
-ofstream joint_desired_log(data_dir / "joint_desired_log.txt");
-ofstream joint_position_log(data_dir / "joint_position_log.txt");
-ofstream joint_velocity_log(data_dir / "joint_velocity_log.txt");
-ofstream foot_traj_log(data_dir / "foot_traj_log.txt");
-ofstream torque_joint_log(data_dir / "torque_joint_log.txt");
-ofstream torque_motor_log(data_dir / "torque_motor_log.txt");
+ofstream joint_desired_log;
+ofstream joint_position_log;
+ofstream joint_velocity_log;
+ofstream foot_traj_log;
+ofstream torque_joint_log;
+ofstream torque_motor_log;
 
 P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     : stm_(stm), dc_(stm.dc_), rd_(stm.dc_.rd_), node_(node)
@@ -16,6 +16,26 @@ P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     , cc_(*new CustomController(dc_, rd_))
     #endif
 {
+    // Select logging directory by launch mode:
+    // simulation.launch on kwan, realrobot.launch on bluerobin.
+    if (dc_.simMode)
+    {
+        data_dir = "/home/kwan/ros2_ws/src/p73_walker_controller/logging/data/";
+    }
+    else
+    {
+        data_dir = "/home/bluerobin/ros2_ws/src/p73_walker_controller/logging/data/";
+    }
+
+    joint_desired_log.open(data_dir / "joint_desired_log.txt");
+    joint_position_log.open(data_dir / "joint_position_log.txt");
+    joint_velocity_log.open(data_dir / "joint_velocity_log.txt");
+    foot_traj_log.open(data_dir / "foot_traj_log.txt");
+    torque_joint_log.open(data_dir / "torque_joint_log.txt");
+    torque_motor_log.open(data_dir / "torque_motor_log.txt");
+
+    std::cout << "CNTRL : log data_dir = " << data_dir << std::endl;
+
     // Create callback group for p73 controller
     cbg_p73_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
@@ -110,19 +130,19 @@ void *P73Controller::TaskCtrlThread()
                     const double sinusoid_joint_max_ = 0.2;
                     const double sinusoid_period_ = 0.5;
 
+                    const double A = sinusoid_joint_max_;
+                    const double B = sinusoid_joint_min_;
+
+                    const double q0 = q_init_(sinusoid_joint_target_);
+
+                    const double c = q0 + 0.5 * (A - B);
+                    const double a = 0.5 * (A + B);
+
                     if (is_pd_tune_init == true)
                     {
                         q_init_ = rd_.q_;
                         q_init_motor_ = rd_.q_motor_;
                         start_time = current_time;
-
-                        const double A = 0.1;
-                        const double B = 0.1;
-
-                        const double q0 = q_init_(sinusoid_joint_target_);
-
-                        const double c = q0 + 0.5 * (A - B);
-                        const double a = 0.5 * (A + B);
 
                         double sin_phi = (q0 - c) / a;
                         sin_phi = std::min(1.0, std::max(-1.0, sin_phi));
@@ -146,12 +166,6 @@ void *P73Controller::TaskCtrlThread()
                     const double t = current_time - start_time;
                     const double w = 2.0 * M_PI / sinusoid_period_;
 
-                    const double A = sinusoid_joint_max_;
-                    const double B = sinusoid_joint_min_;
-
-                    const double q0 = q_init_(sinusoid_joint_target_);
-                    const double c = q0 + 0.5 * (A - B);
-                    const double a = 0.5 * (A + B);
 
                     rd_.q_desired(sinusoid_joint_target_) = c + a * std::sin(w * t + phase);
 
@@ -443,8 +457,6 @@ void *P73Controller::TaskCtrlThread()
 
 
                     static std::string urdf_path;
-                    static pinocchio::Model model_clik;
-                    static pinocchio::Data data_clik;
                     static pinocchio::FrameIndex left_foot_frame_id;
                     static pinocchio::FrameIndex right_foot_frame_id;
 
@@ -455,17 +467,15 @@ void *P73Controller::TaskCtrlThread()
                         rd_.link_local_[Left_Foot].rot_init = rd_.link_local_[Left_Foot].rotm;
                         rd_.link_local_[Right_Foot].rot_init = rd_.link_local_[Right_Foot].rotm;
 
-                        node_->get_parameter("urdf_path", urdf_path);
-                        pinocchio::urdf::buildModel(urdf_path, model_clik);
-                        data_clik = pinocchio::Data(model_clik);
-
-                        left_foot_frame_id = model_clik.getFrameId("L_Foot_Link");
-                        right_foot_frame_id = model_clik.getFrameId("R_Foot_Link");
+                        left_foot_frame_id = rd_.model_clik_.getFrameId("L_Foot_Link");
+                        right_foot_frame_id = rd_.model_clik_.getFrameId("R_Foot_Link");
 
                         std::cout << "left_foot_frame_id: " << left_foot_frame_id << std::endl;
                         std::cout << "right_foot_frame_id: " << right_foot_frame_id << std::endl;
 
                         rd_.q_desired = rd_.q_;
+
+                        std::cout << "init q : " << rd_.q_.transpose() << std::endl;
 
                         std::cout << "===================================" << std::endl;
                         std::cout << "========== IK FLOAT Mode ==========" << std::endl;
@@ -487,14 +497,17 @@ void *P73Controller::TaskCtrlThread()
                     rd_.link_local_[Right_Foot].x_traj = rd_.link_local_[Right_Foot].x_init;
 
                     rd_.link_local_[Left_Foot].x_traj(0)  += circle_radius * (std::cos(phase_left) - std::cos(phase_left_0));
+                    rd_.link_local_[Left_Foot].x_traj(1)  += circle_radius * (std::sin(phase_left) - std::sin(phase_left_0));
                     rd_.link_local_[Left_Foot].x_traj(2)  += circle_radius * (std::sin(phase_left) - std::sin(phase_left_0));
                     rd_.link_local_[Right_Foot].x_traj(0) += circle_radius * (std::cos(phase_right) - std::cos(phase_right_0));
+                    rd_.link_local_[Right_Foot].x_traj(1) -= circle_radius * (std::sin(phase_right) - std::sin(phase_right_0));
                     rd_.link_local_[Right_Foot].x_traj(2) += circle_radius * (std::sin(phase_right) - std::sin(phase_right_0));
 
                     rd_.link_local_[Left_Foot].r_traj = rd_.link_local_[Left_Foot].rot_init;
                     rd_.link_local_[Right_Foot].r_traj = rd_.link_local_[Right_Foot].rot_init;
 
-                    constexpr int clik_max_iter = 50;
+                    constexpr int clik_max_iter = 1000;
+                    int clik_iter_cnt = -1;
                     constexpr double clik_eps = 1e-4;
                     constexpr double clik_step = 0.001;
                     constexpr double clik_damp = 1e-4;
@@ -511,22 +524,22 @@ void *P73Controller::TaskCtrlThread()
 
                     for (int clik_iter = 0; clik_iter < clik_max_iter; clik_iter++)
                     {
-                        pinocchio::forwardKinematics(model_clik, data_clik, q_clik);
-                        pinocchio::updateFramePlacements(model_clik, data_clik);
-                        pinocchio::computeJointJacobians(model_clik, data_clik, q_clik);
+                        pinocchio::forwardKinematics(rd_.model_clik_, rd_.data_clik_, q_clik);
+                        pinocchio::updateFramePlacements(rd_.model_clik_, rd_.data_clik_);
+                        pinocchio::computeJointJacobians(rd_.model_clik_, rd_.data_clik_, q_clik);
 
                         Eigen::MatrixXd J_left(6, MODEL_DOF);
                         Eigen::MatrixXd J_right(6, MODEL_DOF);
-                        pinocchio::getFrameJacobian(model_clik, data_clik, left_foot_frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J_left);
-                        pinocchio::getFrameJacobian(model_clik, data_clik, right_foot_frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J_right);
+                        pinocchio::getFrameJacobian(rd_.model_clik_, rd_.data_clik_, left_foot_frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J_left);
+                        pinocchio::getFrameJacobian(rd_.model_clik_, rd_.data_clik_, right_foot_frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J_right);
 
-                        left_x = data_clik.oMf[left_foot_frame_id].translation();
-                        right_x = data_clik.oMf[right_foot_frame_id].translation();
-                        left_rot = data_clik.oMf[left_foot_frame_id].rotation();
-                        right_rot = data_clik.oMf[right_foot_frame_id].rotation();
+                        left_x = rd_.data_clik_.oMf[left_foot_frame_id].translation();
+                        right_x = rd_.data_clik_.oMf[right_foot_frame_id].translation();
+                        left_rot = rd_.data_clik_.oMf[left_foot_frame_id].rotation();
+                        right_rot = rd_.data_clik_.oMf[right_foot_frame_id].rotation();
 
                         const double kp_pos = 100.0;
-                        const double kp_rot = 1.0;
+                        const double kp_rot = 100.0;
                         rd_.J_task.topRows(6) = J_left;
                         rd_.J_task.bottomRows(6) = J_right;
                         rd_.e_task.segment<3>(0) = kp_pos * (rd_.link_local_[Left_Foot].x_traj - left_x);
@@ -544,25 +557,33 @@ void *P73Controller::TaskCtrlThread()
                         Eigen::MatrixXd JJt = rd_.J_task * rd_.J_task.transpose();
                         Eigen::VectorQd q_delta_joint = rd_.J_task.transpose() * (JJt + clik_damp * Eigen::MatrixXd::Identity(12, 12)).ldlt().solve(rd_.e_task);
                         Eigen::VectorQd v_clik = clik_step * q_delta_joint;
-                        q_clik = pinocchio::integrate(model_clik, q_clik, v_clik);
+                        q_clik = pinocchio::integrate(rd_.model_clik_, q_clik, v_clik);
+
+                        clik_iter_cnt = clik_iter;
                     }
 
                     static int clik_print_count = 0;
-                    if ((clik_print_count++ % 1000) == 0)
-                    {
-                        std::cout << "========== CLIK LOG ==========" << std::endl;
-                        std::cout << "Target Joint Position " << q_clik.transpose() << std::endl;
-                        std::cout << "LeftFoot Position " << left_x.transpose() << std::endl;
-                        std::cout << "RightFoot Position " << right_x.transpose() << std::endl;
-                        std::cout << "LeftFoot PosTraj " <<  rd_.link_local_[Left_Foot].x_traj.transpose() << std::endl;
-                        std::cout << "RightFoot PosTraj " << rd_.link_local_[Right_Foot].x_traj.transpose() << std::endl;
-                        std::cout << "LeftFoot Rotation "  << std::endl << left_rot << std::endl;
-                        std::cout << "RightFoot Rotation " << std::endl << right_rot << std::endl;
-                        std::cout << "LeftFoot RotTraj "  << std::endl << rd_.link_local_[Left_Foot].r_traj << std::endl;
-                        std::cout << "RightFoot RotTraj " << std::endl << rd_.link_local_[Right_Foot].r_traj << std::endl;
-                        std::cout << "CLIK final error: " << rd_.e_task.transpose() << std::endl;
-                        std::cout << "=============================" << std::endl;
-                    }
+                    // if ((clik_print_count++ % 1) == 0)
+                    // {
+                        if(q_clik.allFinite())
+                        {
+                            std::cout << "========== CLIK LOG ==========" << std::endl;
+                            std::cout << "Current Joint Position " << rd_.q_.transpose() << std::endl;
+                            std::cout << "Target Joint Position " << q_clik.transpose() << std::endl;
+                            std::cout << "LeftFoot Position " << left_x.transpose() << std::endl;
+                            std::cout << "RightFoot Position " << right_x.transpose() << std::endl;
+                            std::cout << "LeftFoot PosTraj " <<  rd_.link_local_[Left_Foot].x_traj.transpose() << std::endl;
+                            std::cout << "RightFoot PosTraj " << rd_.link_local_[Right_Foot].x_traj.transpose() << std::endl;
+                            std::cout << "LeftFoot Rotation "  << std::endl << left_rot << std::endl;
+                            std::cout << "RightFoot Rotation " << std::endl << right_rot << std::endl;
+                            std::cout << "LeftFoot RotTraj "  << std::endl << rd_.link_local_[Left_Foot].r_traj << std::endl;
+                            std::cout << "RightFoot RotTraj " << std::endl << rd_.link_local_[Right_Foot].r_traj << std::endl;
+                            std::cout << "CLIK final error: " << rd_.e_task.transpose() << std::endl;
+                            std::cout << "CLIK iteration count: " << clik_iter_cnt << std::endl;
+                            std::cout << "=============================" << std::endl;
+                        }
+
+                    // }
 
                     if(q_clik.allFinite())
                     {

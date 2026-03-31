@@ -61,7 +61,8 @@ StateEstimator::StateEstimator(DataContainer &dc)
         }
     }
 
-
+    pinocchio::urdf::buildModel(urdf_path, rd_global_.model_clik_);
+    rd_global_.data_clik_ = pinocchio::Data(rd_global_.model_clik_);
 
 
 
