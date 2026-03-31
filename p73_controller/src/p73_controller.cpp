@@ -1,7 +1,7 @@
 #include "p73_controller/p73_controller.h"
 using namespace std;
 
-std::filesystem::path data_dir = "/home/kwan/ros2_ws/src/p73_walker_controller/logging/data/";
+std::filesystem::path data_dir = "/home/bluerobin/ros2_ws/src/p73_walker_controller/logging/data/";
 
 ofstream joint_desired_log(data_dir / "joint_desired_log.txt");
 ofstream joint_position_log(data_dir / "joint_position_log.txt");
@@ -341,7 +341,7 @@ void *P73Controller::TaskCtrlThread()
                     static Eigen::VectorQd q_last_ = Eigen::VectorQd::Zero();
 
                     // Chirp configuration
-                    const double chirp_amplitude_ = 0.05;  // [rad]
+                    const double chirp_amplitude_ = 0.1;  // [rad]
                     const double chirp_f0_ = 0.10;         // [Hz]
                     const double chirp_f1_ = 3.00;         // [Hz]
                     const double chirp_duration_ = 30.0;   // [s]
@@ -396,6 +396,10 @@ void *P73Controller::TaskCtrlThread()
                                 {
                                     rd_.q_desired(i) = q_init_(i) - chirp_pos;
                                 }
+                                else if(i == MODEL_DOF - 1)
+                                {
+                                    rd_.q_desired(i) = q_init_(i);
+                                }
                                 else
                                 {
                                     rd_.q_desired(i) = q_init_(i) + chirp_pos;
@@ -432,7 +436,7 @@ void *P73Controller::TaskCtrlThread()
                     static bool is_ik_init = true;
                     static double time_init = 0.0;
 
-                    constexpr double circle_period = 3.0;
+                    constexpr double circle_period = 1.0;
                     // constexpr double circle_radius = 0.02;
                     // constexpr double circle_period = 1.0;
                     constexpr double circle_radius = 0.05;
@@ -493,7 +497,7 @@ void *P73Controller::TaskCtrlThread()
                     constexpr int clik_max_iter = 50;
                     constexpr double clik_eps = 1e-4;
                     constexpr double clik_step = 0.001;
-                    constexpr double clik_damp = 1e-6;
+                    constexpr double clik_damp = 1e-4;
 
                     Eigen::VectorQd q_clik = rd_.q_desired;
 
