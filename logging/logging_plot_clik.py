@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 joint_desired = np.loadtxt("data/joint_desired_log.txt")   # [T, 13]
 joint_position = np.loadtxt("data/joint_position_log.txt") # [T, 13]
 joint_velocity = np.loadtxt("data/joint_velocity_log.txt") # [T, 13]
-torque_sum = np.loadtxt("data/torque_sum_log.txt")         # [T, 26]
+torque_sum = np.loadtxt("data/torque_joint_log.txt")         # [T, 26]
 foot_traj = np.loadtxt("data/foot_traj_log.txt")           # [T, 12]
 
 # =========================

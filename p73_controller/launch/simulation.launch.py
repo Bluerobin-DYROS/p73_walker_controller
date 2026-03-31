@@ -14,7 +14,8 @@ def generate_launch_description():
     p73_description_share = get_package_share_directory('p73_walker_description')
  
     # Model file path
-    model_file = os.path.join(p73_description_share, 'mujoco', 'p73_walker.xml')
+    # model_file = os.path.join(p73_description_share, 'mujoco', 'p73_walker.xml')
+    model_file = os.path.join(p73_description_share, 'mujoco', 'p73_walker_fixed.xml')
     urdf_path = os.path.join(p73_description_share, 'urdf', 'p73_walker.urdf')
 
     setting_sim_PDgain_path = os.path.join(p73_description_share, 'setting', 'setting_sim_PDgain.yaml')

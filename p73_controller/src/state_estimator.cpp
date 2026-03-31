@@ -266,6 +266,11 @@ StateEstimator::StateEstimator(DataContainer &dc)
     for (const auto &param : torque_limit)
         std::cout << std::fixed << std::setprecision(3) << param << " ";
     std::cout << std::endl;
+
+    //--- Pose handling option
+    dc_.node_->declare_parameter<bool>("zero_rpy_for_circular_traj", true);
+    dc_.node_->get_parameter("zero_rpy_for_circular_traj", zero_rpy_for_circular_traj_);
+    std::cout << "zero_rpy_for_circular_traj: " << (zero_rpy_for_circular_traj_ ? "true" : "false") << std::endl;
 }
 
 StateEstimator::~StateEstimator()
@@ -480,6 +485,14 @@ void StateEstimator::InitYaw()
 
     tf2::Quaternion q_mod;
     rd_.yaw = rd_.yaw - rd_.yaw_init;
+
+    if (zero_rpy_for_circular_traj_)
+    {
+        // Keep pelvis orientation fixed to zero for circular trajectory mode.
+        rd_.roll = 0.0;
+        rd_.pitch = 0.0;
+        rd_.yaw = 0.0;
+    }
 
     q_mod.setRPY(rd_.roll, rd_.pitch, rd_.yaw);
 

@@ -69,6 +69,7 @@ public:
     VectorVQd q_dot_virtual_, q_dot_virtual_local_;
 
     Vector3d q_virtual_mjc_, q_dot_virtual_mjc_;
+    bool zero_rpy_for_circular_traj_ = false;
 
     //--- Pinocchio
     LinkData link_[LINK_NUMBER + 1];
