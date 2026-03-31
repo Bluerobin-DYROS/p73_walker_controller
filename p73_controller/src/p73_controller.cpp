@@ -1,13 +1,14 @@
 #include "p73_controller/p73_controller.h"
 using namespace std;
 
-std::filesystem::path data_dir = "/home/kwan/ros2_ws/src/p73_walker_controller/logging/data/";
+std::filesystem::path data_dir = "/home/bluerobin/ros2_ws/src/p73_walker_controller/logging/data/";
 
 ofstream joint_desired_log(data_dir / "joint_desired_log.txt");
 ofstream joint_position_log(data_dir / "joint_position_log.txt");
 ofstream joint_velocity_log(data_dir / "joint_velocity_log.txt");
 ofstream foot_traj_log(data_dir / "foot_traj_log.txt");
-ofstream torque_sum_log(data_dir / "torque_sum_log.txt");
+ofstream torque_joint_log(data_dir / "torque_joint_log.txt");
+ofstream torque_motor_log(data_dir / "torque_motor_log.txt");
 
 P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     : stm_(stm), dc_(stm.dc_), rd_(stm.dc_.rd_), node_(node)
@@ -232,7 +233,6 @@ void *P73Controller::TaskCtrlThread()
                     joint_desired_log << rd_.q_desired(sinusoid_joint_target_) << std::endl;
                     joint_position_log << rd_.q_(sinusoid_joint_target_) << std::endl;
                     joint_velocity_log << rd_.q_dot_(sinusoid_joint_target_) << std::endl;
-                    torque_sum_log << rd_.torque_desired.head(12).transpose() << std::endl;
                 }
                 else if (dc_.task_cmd_.task_mode == 1)  // FRICTION COMPENSATION MODE
                 {
@@ -472,11 +472,13 @@ void *P73Controller::TaskCtrlThread()
                     joint_velocity_log << rd_.q_dot_.transpose() << std::endl;
                     foot_traj_log << rd_.link_local_[Left_Foot].x_traj.transpose() << " " << rd_.link_local_[Right_Foot].x_traj.transpose()  << " " 
                                   << rd_.link_local_[Left_Foot].xpos.transpose() << " " << rd_.link_local_[Right_Foot].xpos.transpose() << std::endl;
-                    torque_sum_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_.transpose() << std::endl;
+                    torque_joint_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_.transpose() << std::endl;
 
                     if(!dc_.simMode){
                         rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);
                     }
+
+                    torque_motor_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_motor_.transpose() << std::endl;
                 }
                 else if (dc_.task_cmd_.task_mode == 4)  // IK MODE (CONTACT)
                 {

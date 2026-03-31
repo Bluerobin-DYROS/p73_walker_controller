@@ -746,6 +746,7 @@ void StateEstimator::StoreState(RobotEigenData &rd_global_)
     memcpy(&rd_global_.q_motor_, &q_motor_, sizeof(VectorQd));
     memcpy(&rd_global_.q_dot_motor_, &q_dot_motor_, sizeof(VectorQd));
     memcpy(&rd_global_.q_torque_, &q_torque_, sizeof(VectorQd));
+    memcpy(&rd_global_.q_torque_motor_, &q_torque_motor_, sizeof(VectorQd));
     memcpy(&rd_global_.q_virtual_, &q_virtual_, sizeof(VectorQVQd));
     memcpy(&rd_global_.q_dot_virtual_, &q_dot_virtual_, sizeof(VectorVQd));
 

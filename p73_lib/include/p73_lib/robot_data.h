@@ -73,7 +73,7 @@ struct RobotEigenData
     // joint position and velocity
     VectorQd q_, q_dot_, q_torque_; 
     VectorQd q_dot_lpf_; 
-    VectorQd q_motor_, q_dot_motor_;
+    VectorQd q_motor_, q_dot_motor_, q_torque_motor_;
 
     VectorQVQd q_virtual_;
     VectorVQd q_dot_virtual_;
