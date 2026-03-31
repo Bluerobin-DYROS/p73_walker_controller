@@ -479,17 +479,8 @@ void StateEstimator::InitYaw()
     }
 
     tf2::Quaternion q_mod;
-    if(dc_.simMode)
-    {
-        rd_.yaw = rd_.yaw - rd_.yaw_init;
-    }
-    else
-    {
-        // TILL FIX IMU
-        rd_.roll = 0.0;
-        rd_.pitch = 0.0;
-        rd_.yaw = 0.0;
-    }
+    rd_.yaw = rd_.yaw - rd_.yaw_init;
+
     q_mod.setRPY(rd_.roll, rd_.pitch, rd_.yaw);
 
     q_virtual_local_(3) = q_mod.getX();

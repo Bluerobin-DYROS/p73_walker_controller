@@ -15,9 +15,7 @@
   <depend>br_driver</depend>
   <depend>sensor_msgs</depend>
 
-  <depend>br_model</depend>
-  <depend>br_rl</depend>
-  <depend>br_avatar</depend>
+  <depend>p73_cc</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

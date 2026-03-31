@@ -105,10 +105,10 @@ void *P73Controller::TaskCtrlThread()
                     static Eigen::VectorQd q_init_ = Eigen::VectorQd::Zero();
                     static Eigen::VectorQd q_init_motor_ = Eigen::VectorQd::Zero();
 
-                    const int sinusoid_joint_target_ = 12;
-                    const double sinusoid_joint_min_ = 0.1;
-                    const double sinusoid_joint_max_ = 0.1;
-                    const double sinusoid_period_ = 1.5;
+                    const int sinusoid_joint_target_ = 5;
+                    const double sinusoid_joint_min_ = 0.2;
+                    const double sinusoid_joint_max_ = 0.2;
+                    const double sinusoid_period_ = 0.5;
 
                     if (is_pd_tune_init == true)
                     {
@@ -340,7 +340,7 @@ void *P73Controller::TaskCtrlThread()
                     constexpr double circle_period = 3.0;
                     // constexpr double circle_radius = 0.02;
                     // constexpr double circle_period = 1.0;
-                    constexpr double circle_radius = 0.1;
+                    constexpr double circle_radius = 0.01;
 
 
                     static std::string urdf_path;
@@ -427,7 +427,7 @@ void *P73Controller::TaskCtrlThread()
                         right_rot = data_clik.oMf[right_foot_frame_id].rotation();
 
                         const double kp_pos = 100.0;
-                        const double kp_rot = 10.0;
+                        const double kp_rot = 1.0;
                         rd_.J_task.topRows(6) = J_left;
                         rd_.J_task.bottomRows(6) = J_right;
                         rd_.e_task.segment<3>(0) = kp_pos * (rd_.link_local_[Left_Foot].x_traj - left_x);
