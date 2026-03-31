@@ -563,8 +563,8 @@ void *P73Controller::TaskCtrlThread()
                     }
 
                     static int clik_print_count = 0;
-                    // if ((clik_print_count++ % 1) == 0)
-                    // {
+                    if ((clik_print_count++ % 1000) == 0)
+                    {
                         if(q_clik.allFinite())
                         {
                             std::cout << "========== CLIK LOG ==========" << std::endl;
@@ -582,8 +582,7 @@ void *P73Controller::TaskCtrlThread()
                             std::cout << "CLIK iteration count: " << clik_iter_cnt << std::endl;
                             std::cout << "=============================" << std::endl;
                         }
-
-                    // }
+                    }
 
                     if(q_clik.allFinite())
                     {
