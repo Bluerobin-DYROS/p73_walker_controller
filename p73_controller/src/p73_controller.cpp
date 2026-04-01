@@ -105,7 +105,7 @@ void *P73Controller::TaskCtrlThread()
                     rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
                 }
 
-                if(dc_.simMode){
+                if(!dc_.simMode){
                     // rd_.torque_desired = WBC::JointPositionToMotorTorque(rd_);
                     rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);
                 }
@@ -557,7 +557,7 @@ void *P73Controller::TaskCtrlThread()
                     static bool is_ik_init = true;
                     static double time_init = 0.0;
 
-                    constexpr double circle_period = 1.0;
+                    constexpr double circle_period = 1.0;   // Should be higher than 1.0
                     // constexpr double circle_radius = 0.02;
                     // constexpr double circle_period = 1.0;
                     constexpr double circle_radius = 0.05;

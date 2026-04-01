@@ -111,7 +111,7 @@ struct DataContainer
     std::atomic<bool> triggerThread1;
     double command_[MODEL_DOF]; // it can be torque command or position command
 
-    bool simMode = true;
+    bool simMode = false;
     bool useMjcVirtual = false; // using mujoco data for state estimation
 
     rclcpp::Node::SharedPtr node_;
