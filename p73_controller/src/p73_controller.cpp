@@ -562,7 +562,7 @@ void *P73Controller::TaskCtrlThread()
                     constexpr double circle_period = 1.0;   // Should be higher than 1.0
                     // constexpr double circle_radius = 0.02;
                     // constexpr double circle_period = 1.0;
-                    constexpr double circle_radius = 0.05;
+                    constexpr double circle_radius = 0.05;  // should be smaller than 0.5
 
 
                     static std::string urdf_path;
