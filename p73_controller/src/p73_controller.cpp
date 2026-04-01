@@ -27,6 +27,8 @@ P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
         data_dir = "/home/bluerobin/ros2_ws/src/p73_walker_controller/logging/data/";
     }
 
+    data_dir = "/home/kwan/ros2_ws/src/p73_walker_controller/logging/data/";
+
     joint_desired_log.open(data_dir / "joint_desired_log.txt");
     joint_position_log.open(data_dir / "joint_position_log.txt");
     joint_velocity_log.open(data_dir / "joint_velocity_log.txt");
@@ -603,12 +605,14 @@ void *P73Controller::TaskCtrlThread()
                     rd_.link_local_[Left_Foot].x_traj = rd_.link_local_[Left_Foot].x_init;
                     rd_.link_local_[Right_Foot].x_traj = rd_.link_local_[Right_Foot].x_init;
 
-                    rd_.link_local_[Left_Foot].x_traj(0)  += circle_radius * (std::cos(phase_left) - std::cos(phase_left_0));
+                    rd_.link_local_[Left_Foot].x_traj(0)  += circle_radius * (std::sin(phase_left) - std::sin(phase_left_0));
                     rd_.link_local_[Left_Foot].x_traj(1)  += circle_radius * (std::sin(phase_left) - std::sin(phase_left_0));
-                    rd_.link_local_[Left_Foot].x_traj(2)  += circle_radius * (std::sin(phase_left) - std::sin(phase_left_0));
-                    rd_.link_local_[Right_Foot].x_traj(0) += circle_radius * (std::cos(phase_right) - std::cos(phase_right_0));
+                    // rd_.link_local_[Left_Foot].x_traj(2)  += circle_radius * (std::sin(phase_left) - std::sin(phase_left_0));
+                    rd_.link_local_[Left_Foot].x_traj(2)  += circle_radius * (1.0 - std::cos(phase_left - phase_left_0));
+                    rd_.link_local_[Right_Foot].x_traj(0) += circle_radius * (std::sin(phase_right) - std::sin(phase_right_0));
                     rd_.link_local_[Right_Foot].x_traj(1) -= circle_radius * (std::sin(phase_right) - std::sin(phase_right_0));
-                    rd_.link_local_[Right_Foot].x_traj(2) += circle_radius * (std::sin(phase_right) - std::sin(phase_right_0));
+                    // rd_.link_local_[Right_Foot].x_traj(2) += circle_radius * (std::sin(phase_right) - std::sin(phase_right_0));
+                    rd_.link_local_[Right_Foot].x_traj(2) += circle_radius * (1.0 - std::cos(phase_right - phase_right_0));
 
                     rd_.link_local_[Left_Foot].r_traj = rd_.link_local_[Left_Foot].rot_init;
                     rd_.link_local_[Right_Foot].r_traj = rd_.link_local_[Right_Foot].rot_init;
