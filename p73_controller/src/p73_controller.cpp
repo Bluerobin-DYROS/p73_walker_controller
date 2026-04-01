@@ -100,14 +100,14 @@ void *P73Controller::TaskCtrlThread()
                 if (!dc_.positionHoldSwitch)
                     rd_.q_desired = DyrosMath::cubicVector(rd_.control_time_, dc_.pos_ctrl_t_, dc_.pos_ctrl_t_ + dc_.pos_ctrl_traj_t_, dc_.pos_ctrl_q_init, dc_.pos_ctrl_q_des, dc_.pos_ctrl_q_vel_init, zero_m);
                 
-                if(!dc_.simMode){
-                    rd_.torque_desired = WBC::JointPositionToMotorTorque(rd_);
+                for(int i = 0; i < MODEL_DOF; i++)
+                {
+                    rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
                 }
-                else{
-                    for(int i = 0; i < MODEL_DOF; i++)
-                    {
-                        rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
-                    }
+
+                if(dc_.simMode){
+                    // rd_.torque_desired = WBC::JointPositionToMotorTorque(rd_);
+                    rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);
                 }
             }
             else if (dc_.tc_mode)
@@ -355,7 +355,7 @@ void *P73Controller::TaskCtrlThread()
                     static Eigen::VectorQd q_last_ = Eigen::VectorQd::Zero();
 
                     // Chirp configuration
-                    const double chirp_amplitude_ = 0.1;  // [rad]
+                    const double chirp_amplitude_ = 0.05;  // [rad]
                     const double chirp_f0_ = 0.10;         // [Hz]
                     const double chirp_f1_ = 3.00;         // [Hz]
                     const double chirp_duration_ = 30.0;   // [s]
@@ -445,7 +445,114 @@ void *P73Controller::TaskCtrlThread()
                         torque_motor_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_motor_.transpose() << std::endl;
                     }
                 }
-                else if (dc_.task_cmd_.task_mode == 3)  // IK MODE (FLOAT)
+                else if (dc_.task_cmd_.task_mode == 3)  // CHIRP DATA VALIDATION
+                {
+                    static bool is_validation_init = true;
+                    static bool validation_finish_printed = false;
+                    static size_t validation_step = 0;
+                    static std::vector<Eigen::VectorQd> desired_traj;
+
+                    if (is_validation_init)
+                    {
+                        desired_traj.clear();
+                        validation_step = 0;
+                        validation_finish_printed = false;
+
+                        const std::filesystem::path desired_path = data_dir.parent_path().parent_path() / "data_amplitude_0.05" / "joint_desired_log.txt";
+                        std::ifstream fin(desired_path);
+
+                        if (!fin.is_open())
+                        {
+                            std::cout << "CNTRL ERROR: Failed to open validation file: " << desired_path << std::endl;
+                        }
+                        else
+                        {
+                            std::string line;
+                            while (std::getline(fin, line))
+                            {
+                                if (line.empty())
+                                {
+                                    continue;
+                                }
+
+                                std::istringstream iss(line);
+                                Eigen::VectorQd qd = Eigen::VectorQd::Zero();
+                                bool valid_line = true;
+                                for (int i = 0; i < MODEL_DOF; ++i)
+                                {
+                                    if (!(iss >> qd(i)))
+                                    {
+                                        valid_line = false;
+                                        break;
+                                    }
+                                }
+
+                                if (valid_line)
+                                {
+                                    desired_traj.push_back(qd);
+                                }
+                            }
+                        }
+
+                        if (desired_traj.empty())
+                        {
+                            std::cout << "CNTRL ERROR: Validation trajectory is empty. Holding current posture." << std::endl;
+                            rd_.q_desired = rd_.q_;
+                        }
+                        else
+                        {
+                            std::cout << "==========================================" << std::endl;
+                            std::cout << "======= CHIRP DATA VALIDATION MODE =======" << std::endl;
+                            std::cout << "Trajectory file : " << desired_path << std::endl;
+                            std::cout << "Trajectory steps: " << desired_traj.size() << std::endl;
+                            std::cout << "==========================================" << std::endl;
+                            rd_.q_desired = desired_traj.front();
+                        }
+
+                        is_validation_init = false;
+                    }
+
+                    if (!desired_traj.empty())
+                    {
+                        if (validation_step < desired_traj.size())
+                        {
+                            rd_.q_desired = desired_traj[validation_step];
+                            validation_step++;
+                        }
+                        else
+                        {
+                            rd_.q_desired = desired_traj.back();
+                            if (!validation_finish_printed)
+                            {
+                                std::cout << "CNTRL : Chirp validation replay finished. Holding final trajectory point." << std::endl;
+                                validation_finish_printed = true;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        rd_.q_desired = rd_.q_;
+                    }
+
+                    // Track replayed desired trajectory.
+                    for (int i = 0; i < MODEL_DOF; i++)
+                    {
+                        rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                    }
+
+                    // Log desired/actual states and torques for validation.
+                    joint_desired_log << rd_.q_desired.transpose() << std::endl;
+                    joint_position_log << rd_.q_.transpose() << std::endl;
+                    joint_velocity_log << rd_.q_dot_.transpose() << std::endl;
+                    torque_joint_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_.transpose() << std::endl;
+
+                    if (!dc_.simMode)
+                    {
+                        rd_.torque_desired = rd_.four_bar_Jaco_.transpose() * rd_.torque_desired;
+                        torque_motor_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_motor_.transpose() << std::endl;
+                    }
+                }
+                else if (dc_.task_cmd_.task_mode == 4)  // IK MODE (FLOAT)
                 {
                     static bool is_ik_init = true;
                     static double time_init = 0.0;
@@ -616,41 +723,6 @@ void *P73Controller::TaskCtrlThread()
                         torque_motor_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_motor_.transpose() << std::endl;
                     }
 
-                }
-                else if (dc_.task_cmd_.task_mode == 4)  // IK MODE (CONTACT)
-                {
-                    WBC::SetContact(rd_, true, true);
-                    static bool is_ik_init = true;
-                    static double time_init = 0.0;
-                    if (is_ik_init){
-                        time_init = rd_.control_time_;
-                        rd_.link_[Pelvis].x_init = rd_.link_[Pelvis].xpos;
-
-                        std::cout << "==================================" << std::endl;
-                        std::cout << "========== IK CONTACT Mode ==========" << std::endl;
-                        std::cout << "==================================" << std::endl;
-
-                        is_ik_init = false;
-                    }
-
-                    rd_.link_[Pelvis].x_desired = rd_.link_[Pelvis].x_init;
-                    rd_.link_[Pelvis].x_desired(2) += -0.1;
-                    rd_.link_[Pelvis].SetTrajectoryQuintic(rd_.control_time_, time_init, time_init + 3.0, rd_.link_[Pelvis].x_init, rd_.link_[Pelvis].x_desired);
-
-                    rd_.J_task.setZero(6, MODEL_DOF_VIRTUAL);
-                    rd_.e_task.setZero(6);
-                    rd_.J_task = rd_.link_[Pelvis].jac;
-                    rd_.e_task.head(3) = rd_.link_[Pelvis].x_traj - rd_.link_[Pelvis].xpos;
-                    rd_.e_task.tail(3) = -DyrosMath::getPhi(rd_.link_[Pelvis].rotm, Eigen::Matrix3d::Identity());
-                    WBC::NullspaceInverseKinematics(rd_);
-
-                    for (int i = 0; i < MODEL_DOF; i++) {
-                        rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
-                    }
-                     
-                    if(!dc_.simMode){
-                        rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);
-                    }
                 }
 #ifdef COMPILE_CC
                 else if (dc_.task_cmd_.task_mode >= 5 && dc_.task_cmd_.task_mode < 10)
