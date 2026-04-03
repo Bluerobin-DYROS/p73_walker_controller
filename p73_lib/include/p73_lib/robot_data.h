@@ -98,6 +98,7 @@ struct RobotEigenData
     VectorQd q_desired, q_dot_desired, torque_desired;
     VectorQd q_motor_desired, torque_motor_desired;
     MatrixQQd four_bar_Jaco_, four_bar_Jaco_inv_;
+    Vector12d torque_actuatornet_;
 };
 
 struct DataContainer

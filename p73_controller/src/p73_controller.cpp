@@ -9,6 +9,7 @@ ofstream joint_velocity_log;
 ofstream foot_traj_log;
 ofstream torque_joint_log;
 ofstream torque_motor_log;
+ofstream torque_net_log;
 
 P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     : stm_(stm), dc_(stm.dc_), rd_(stm.dc_.rd_), node_(node)
@@ -16,27 +17,18 @@ P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     , cc_(*new CustomController(dc_, rd_))
     #endif
 {
-    // Select logging directory by launch mode:
-    // simulation.launch on kwan, realrobot.launch on bluerobin.
-    if (dc_.simMode)
-    {
-        data_dir = "/home/kwan/ros2_ws/src/p73_walker_controller/logging/data/";
-    }
-    else
-    {
-        data_dir = "/home/bluerobin/ros2_ws/src/p73_walker_controller/logging/data/";
-    }
-
-    data_dir = "/home/kwan/ros2_ws/src/p73_walker_controller/logging/data/";
-
+    data_dir = "/home/dyros/ros2_ws/src/p73_walker_controller/logging/data/";
     joint_desired_log.open(data_dir / "joint_desired_log.txt");
     joint_position_log.open(data_dir / "joint_position_log.txt");
     joint_velocity_log.open(data_dir / "joint_velocity_log.txt");
     foot_traj_log.open(data_dir / "foot_traj_log.txt");
     torque_joint_log.open(data_dir / "torque_joint_log.txt");
     torque_motor_log.open(data_dir / "torque_motor_log.txt");
+    torque_net_log.open(data_dir / "torque_net_log.txt");
 
     std::cout << "CNTRL : log data_dir = " << data_dir << std::endl;
+
+    WBC::loadActuatorNetModels();
 
     // Create callback group for p73 controller
     cbg_p73_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -453,12 +445,14 @@ void *P73Controller::TaskCtrlThread()
                     static bool validation_finish_printed = false;
                     static size_t validation_step = 0;
                     static std::vector<Eigen::VectorQd> desired_traj;
+                    static double start_time = 0.0;
 
                     if (is_validation_init)
                     {
                         desired_traj.clear();
                         validation_step = 0;
                         validation_finish_printed = false;
+                        start_time = rd_.control_time_;
 
                         const std::filesystem::path desired_path = data_dir.parent_path().parent_path() / "data_amplitude_0.05" / "joint_desired_log.txt";
                         std::ifstream fin(desired_path);
@@ -536,17 +530,22 @@ void *P73Controller::TaskCtrlThread()
                         rd_.q_desired = rd_.q_;
                     }
 
-                    // Track replayed desired trajectory.
-                    for (int i = 0; i < MODEL_DOF; i++)
-                    {
+                    for (int i=0; i<MODEL_DOF; i++){
                         rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
                     }
+
+                    // ActuatorNet runs in background for logging only (skip first 0.02s while buffer fills)
+                    double elapsed_time = rd_.control_time_ - start_time;
+                    Eigen::Vector12d net_torque = WBC::inferActuatorTorqueFromNet(rd_, elapsed_time);
+
+                    if (elapsed_time < 0.02) continue;
 
                     // Log desired/actual states and torques for validation.
                     joint_desired_log << rd_.q_desired.transpose() << std::endl;
                     joint_position_log << rd_.q_.transpose() << std::endl;
                     joint_velocity_log << rd_.q_dot_.transpose() << std::endl;
-                    torque_joint_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_.transpose() << std::endl;
+                    torque_joint_log << rd_.torque_desired.head(12).transpose() << " " << rd_.q_torque_.head(12).transpose() << std::endl;
+                    torque_net_log << net_torque.transpose() << std::endl;
 
                     if (!dc_.simMode)
                     {
@@ -711,16 +710,25 @@ void *P73Controller::TaskCtrlThread()
                         rd_.q_desired = q_last;
                     }
 
+                    Eigen::VectorQd pd_torque_4;
                     for (int i = 0; i < MODEL_DOF; i++) {
-                        rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                        pd_torque_4(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
                     }
+
+                    Eigen::Vector12d net_torque_4 = WBC::inferActuatorTorqueFromNet(rd_, elapsed);
+
+                    // PD torque always applied, net runs in background for logging only
+                    rd_.torque_desired = pd_torque_4;
+
+                    if (elapsed < 0.02) continue;
 
                     joint_desired_log << rd_.q_desired.transpose() << std::endl;
                     joint_position_log << rd_.q_.transpose() << std::endl;
                     joint_velocity_log << rd_.q_dot_.transpose() << std::endl;
-                    foot_traj_log << rd_.link_local_[Left_Foot].x_traj.transpose() << " " << rd_.link_local_[Right_Foot].x_traj.transpose()  << " " 
+                    foot_traj_log << rd_.link_local_[Left_Foot].x_traj.transpose() << " " << rd_.link_local_[Right_Foot].x_traj.transpose()  << " "
                                   << rd_.link_local_[Left_Foot].xpos.transpose() << " " << rd_.link_local_[Right_Foot].xpos.transpose() << std::endl;
-                    torque_joint_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_.transpose() << std::endl;
+                    torque_joint_log << pd_torque_4.head(12).transpose() << " " << rd_.q_torque_.head(12).transpose() << std::endl;
+                    torque_net_log << net_torque_4.transpose() << std::endl;
 
                     if(!dc_.simMode){
                         rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);

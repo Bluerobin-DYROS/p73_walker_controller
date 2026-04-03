@@ -1,6 +1,15 @@
 #include "wholebody_functions.h"
+#include <onnxruntime/onnxruntime_cxx_api.h>
+#include <vector>
 
 using namespace P73;
+
+namespace {
+    Ort::Env g_ort_env{ORT_LOGGING_LEVEL_WARNING, "actuatornet"};
+    Ort::SessionOptions g_session_options;
+    std::vector<Ort::Session> g_sessions;
+    bool g_models_ready = false;
+}
 
 namespace WBC
 {
@@ -200,4 +209,116 @@ namespace WBC
 
         return torque_motor;
     }
+
+    void loadActuatorNetModels()
+    {
+        if (g_models_ready) return;
+        try {
+            std::string p = "/home/dyros/ros2_ws/src/p73_walker_controller/p73_lib/src/actuatornet_models/";
+            std::vector<std::string> model_names = {
+                "p73_left_hip_roll",  "p73_left_hip_pitch", "p73_left_hip_yaw",
+                "p73_left_knee_pitch","p73_left_ankle",
+                "p73_right_hip_roll", "p73_right_hip_pitch","p73_right_hip_yaw",
+                "p73_right_knee_pitch","p73_right_ankle"
+            };
+            g_session_options.SetIntraOpNumThreads(1);
+            g_session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+            for (auto& name : model_names) {
+                g_sessions.emplace_back(g_ort_env, (p + name + ".onnx").c_str(), g_session_options);
+            }
+            g_models_ready = true;
+            std::cout << "All ActuatorNet Models Loaded Successfully!" << std::endl;
+        } catch (const Ort::Exception& e) {
+            std::cerr << "Error loading ActuatorNet models: " << e.what() << std::endl;
+        }
+    }
+
+    Vector12d inferActuatorTorqueFromNet(RobotEigenData& rd_, double elapsed_time)
+    {
+        //--- Description:
+        // rd_.q_ : joint position
+        // rd_.q_desired : joint position desired
+        // rd_.q_dot_ : joint velocity
+        // rd_.q_torque_ : joint torque
+        
+        //--- ToDo:
+        // 1. load 10 Networks (pt or onnx)
+        // 2. load history vector (joint position, velocity, torque)
+        // 2. infer torque from network.
+        // 3. return inferred torque (rd_.torque_actuatornet_).
+        // 
+
+        if (!g_models_ready)
+        {
+            std::cerr << "ActuatorNet: models not loaded. Call loadActuatorNetModels() before inference." << std::endl;
+            return Eigen::Vector12d::Zero();
+        }
+
+        const int HISTORY_SIZE = 21;
+        static Eigen::MatrixXd e_hist      = Eigen::MatrixXd::Zero(12, HISTORY_SIZE);
+        static Eigen::MatrixXd v_hist      = Eigen::MatrixXd::Zero(12, HISTORY_SIZE);
+        static Eigen::MatrixXd e_hist_prev = Eigen::MatrixXd::Zero(12, HISTORY_SIZE);
+        static Eigen::MatrixXd v_hist_prev = Eigen::MatrixXd::Zero(12, HISTORY_SIZE);
+
+        e_hist_prev = e_hist;
+        v_hist_prev = v_hist;
+
+        e_hist.leftCols(HISTORY_SIZE - 1) = e_hist_prev.rightCols(HISTORY_SIZE - 1);
+        v_hist.leftCols(HISTORY_SIZE - 1) = v_hist_prev.rightCols(HISTORY_SIZE - 1);
+        e_hist.col(HISTORY_SIZE - 1) = (rd_.q_desired - rd_.q_).head(12);
+        v_hist.col(HISTORY_SIZE - 1) = rd_.q_dot_.head(12);
+
+        int idx_t0 = HISTORY_SIZE - 1;   // t      = col 20
+        int idx_t1 = HISTORY_SIZE - 11;  // t-10   = col 10
+        int idx_t2 = 0;                  // t-20   = col 0
+
+        std::vector<std::vector<int>> joint_groups = {
+            {0}, {1}, {2}, {3}, {4,5},
+            {6}, {7}, {8}, {9}, {10,11}
+        };
+        Eigen::Vector12d inferred_torque = Eigen::Vector12d::Zero();
+
+        Ort::AllocatorWithDefaultOptions allocator;
+        for (int i = 0; i < 10; ++i) {
+            int num_joints  = joint_groups[i].size();
+            int feature_size = num_joints * 6;
+
+            std::vector<float> features(feature_size);
+            int f_idx = 0;
+            for (int j : joint_groups[i]) {
+                features[f_idx++] = e_hist(j, idx_t0);
+                features[f_idx++] = e_hist(j, idx_t1);
+                features[f_idx++] = e_hist(j, idx_t2);
+                features[f_idx++] = v_hist(j, idx_t0);
+                features[f_idx++] = v_hist(j, idx_t1);
+                features[f_idx++] = v_hist(j, idx_t2);
+            }
+
+            std::array<int64_t, 2> input_shape{1, feature_size};
+            Ort::MemoryInfo mem_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+            Ort::Value input_tensor  = Ort::Value::CreateTensor<float>(
+                mem_info, features.data(), feature_size, input_shape.data(), input_shape.size());
+
+            auto input_name  = g_sessions[i].GetInputNameAllocated(0, allocator);
+            auto output_name = g_sessions[i].GetOutputNameAllocated(0, allocator);
+            const char* input_names[]  = {input_name.get()};
+            const char* output_names[] = {output_name.get()};
+
+            try {
+                auto output_tensors = g_sessions[i].Run(
+                    Ort::RunOptions{nullptr}, input_names, &input_tensor, 1, output_names, 1);
+                float* out_data = output_tensors[0].GetTensorMutableData<float>();
+                for (int j = 0; j < num_joints; ++j) {
+                    inferred_torque(joint_groups[i][j]) = out_data[j] / 0.01f;
+                }
+            } catch (const Ort::Exception& e) {
+                std::cerr << "Error during inference " << i << ": " << e.what() << std::endl;
+            }
+        }
+        rd_.torque_actuatornet_ = inferred_torque;
+
+        return rd_.torque_actuatornet_;
+
+    }
+
 }

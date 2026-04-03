@@ -30,6 +30,10 @@ namespace WBC
     VectorQd JointTorqueToMotorTorque(RobotEigenData& rd_, const Eigen::VectorQd& torque_joint);
     VectorQd JointPositionToMotorTorque(RobotEigenData& rd_);
 
+    //--- Utility
+    void loadActuatorNetModels();
+    Vector12d inferActuatorTorqueFromNet(RobotEigenData& rd_, double elapsed_time);
+
     void CheckTorqueLimit(RobotEigenData &rd_, VectorQd command_torque);
 }
 

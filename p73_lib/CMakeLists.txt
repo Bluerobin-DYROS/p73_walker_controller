@@ -14,6 +14,16 @@ find_package(osqp REQUIRED)
 find_package(OsqpEigen REQUIRED)
 find_package(br_driver REQUIRED)
 
+set(ONNXRUNTIME_INCLUDE_DIR "/usr/local/include/onnxruntime")
+set(ONNXRUNTIME_LIB_DIR "/usr/local/lib")
+find_library(ONNXRUNTIME_LIB onnxruntime HINTS ${ONNXRUNTIME_LIB_DIR})
+
+if(NOT ONNXRUNTIME_LIB)
+  message(FATAL_ERROR "ONNX Runtime library not found. Please run install_onnx.sh first.")
+endif()
+
+message(STATUS "ONNX Runtime: ${ONNXRUNTIME_LIB}")
+
 add_library(${PROJECT_NAME}
   src/qp.cpp
   src/link.cpp
@@ -34,7 +44,9 @@ target_link_libraries(p73_lib
   pinocchio::pinocchio
   osqp::osqp
   OsqpEigen::OsqpEigen
+  ${ONNXRUNTIME_LIB}
 )
+target_include_directories(${PROJECT_NAME} PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
 ament_target_dependencies(p73_lib
   rclcpp 
   p73_msgs 
