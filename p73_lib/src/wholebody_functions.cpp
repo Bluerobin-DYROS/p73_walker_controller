@@ -214,7 +214,7 @@ namespace WBC
     {
         if (g_models_ready) return;
         try {
-            std::string p = "/home/dyros/ros2_ws/src/p73_walker_controller/p73_lib/src/actuatornet_models/";
+            std::string p = "/home/bluerobin/ros2_ws/src/p73_walker_controller/p73_lib/src/actuatornet_models/";
             std::vector<std::string> model_names = {
                 "p73_left_hip_roll",  "p73_left_hip_pitch", "p73_left_hip_yaw",
                 "p73_left_knee_pitch","p73_left_ankle",

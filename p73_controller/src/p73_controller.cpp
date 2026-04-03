@@ -17,7 +17,8 @@ P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     , cc_(*new CustomController(dc_, rd_))
     #endif
 {
-    data_dir = "/home/dyros/ros2_ws/src/p73_walker_controller/logging/data/";
+    data_dir = "/home/bluerobin/ros2_ws/src/p73_walker_controller/logging/data/";
+
     joint_desired_log.open(data_dir / "joint_desired_log.txt");
     joint_position_log.open(data_dir / "joint_position_log.txt");
     joint_velocity_log.open(data_dir / "joint_velocity_log.txt");
@@ -349,9 +350,9 @@ void *P73Controller::TaskCtrlThread()
                     static Eigen::VectorQd q_last_ = Eigen::VectorQd::Zero();
 
                     // Chirp configuration
-                    const double chirp_amplitude_ = 0.05;  // [rad]
+                    const double chirp_amplitude_ = 0.3;  // [rad]
                     const double chirp_f0_ = 0.10;         // [Hz]
-                    const double chirp_f1_ = 3.00;         // [Hz]
+                    const double chirp_f1_ = 1.00;         // [Hz]
                     const double chirp_duration_ = 30.0;   // [s]
 
                     const double current_time = rd_.control_time_;
@@ -422,16 +423,20 @@ void *P73Controller::TaskCtrlThread()
                     }
 
                     // Compute chirp torques for all joints in joint space.
-                    for (int i = 0; i < MODEL_DOF; i++)
-                    {
+                    for (int i=0; i<MODEL_DOF; i++){
                         rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
                     }
 
-                    // Log full vectors for all-joint identification.
+                    // ActuatorNet runs in background for logging only (skip first 0.02s while buffer fills)
+                    double elapsed_time = rd_.control_time_ - chirp_start_time;
+                    Eigen::Vector12d net_torque = WBC::inferActuatorTorqueFromNet(rd_, elapsed_time);
+
+                    // Log desired/actual states and torques for validation.
                     joint_desired_log << rd_.q_desired.transpose() << std::endl;
                     joint_position_log << rd_.q_.transpose() << std::endl;
                     joint_velocity_log << rd_.q_dot_.transpose() << std::endl;
-                    torque_joint_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_.transpose() << std::endl;
+                    torque_joint_log << rd_.torque_desired.head(12).transpose() << " " << rd_.q_torque_.head(12).transpose() << std::endl;
+                    torque_net_log << net_torque.transpose() << std::endl;
 
                     if (!dc_.simMode)
                     {
@@ -538,8 +543,6 @@ void *P73Controller::TaskCtrlThread()
                     double elapsed_time = rd_.control_time_ - start_time;
                     Eigen::Vector12d net_torque = WBC::inferActuatorTorqueFromNet(rd_, elapsed_time);
 
-                    if (elapsed_time < 0.02) continue;
-
                     // Log desired/actual states and torques for validation.
                     joint_desired_log << rd_.q_desired.transpose() << std::endl;
                     joint_position_log << rd_.q_.transpose() << std::endl;
@@ -556,12 +559,12 @@ void *P73Controller::TaskCtrlThread()
                 else if (dc_.task_cmd_.task_mode == 4)  // IK MODE (FLOAT)
                 {
                     static bool is_ik_init = true;
-                    static double time_init = 0.0;
+                    static double start_time = 0.0;
 
-                    constexpr double circle_period = 1.0;   // Should be higher than 1.0
+                    constexpr double circle_period = 2.0;   // Should be higher than 1.0
                     // constexpr double circle_radius = 0.02;
                     // constexpr double circle_period = 1.0;
-                    constexpr double circle_radius = 0.05;  // should be smaller than 0.5
+                    constexpr double circle_radius = 0.03;  // should be smaller than 0.5
 
 
                     static std::string urdf_path;
@@ -569,7 +572,7 @@ void *P73Controller::TaskCtrlThread()
                     static pinocchio::FrameIndex right_foot_frame_id;
 
                     if (is_ik_init){
-                        time_init = rd_.control_time_;
+                        start_time = rd_.control_time_;
                         rd_.link_local_[Left_Foot].x_init = rd_.link_local_[Left_Foot].xpos;
                         rd_.link_local_[Right_Foot].x_init = rd_.link_local_[Right_Foot].xpos;
                         rd_.link_local_[Left_Foot].rot_init = rd_.link_local_[Left_Foot].rotm;
@@ -594,7 +597,7 @@ void *P73Controller::TaskCtrlThread()
                         is_ik_init = false;
                     }
 
-                    const double elapsed = rd_.control_time_ - time_init;
+                    const double elapsed = rd_.control_time_ - start_time;
                     const double omega = 2.0 * M_PI / circle_period;
                     const double phase_left = omega * elapsed;
                     const double phase_right = phase_left + M_PI;
@@ -710,31 +713,26 @@ void *P73Controller::TaskCtrlThread()
                         rd_.q_desired = q_last;
                     }
 
-                    Eigen::VectorQd pd_torque_4;
-                    for (int i = 0; i < MODEL_DOF; i++) {
-                        pd_torque_4(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
+                    for (int i=0; i<MODEL_DOF; i++){
+                        rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
                     }
 
-                    Eigen::Vector12d net_torque_4 = WBC::inferActuatorTorqueFromNet(rd_, elapsed);
+                    // ActuatorNet runs in background for logging only (skip first 0.02s while buffer fills)
+                    double elapsed_time = rd_.control_time_ - start_time;
+                    Eigen::Vector12d net_torque = WBC::inferActuatorTorqueFromNet(rd_, elapsed_time);
 
-                    // PD torque always applied, net runs in background for logging only
-                    rd_.torque_desired = pd_torque_4;
-
-                    if (elapsed < 0.02) continue;
-
+                    // Log desired/actual states and torques for validation.
                     joint_desired_log << rd_.q_desired.transpose() << std::endl;
                     joint_position_log << rd_.q_.transpose() << std::endl;
                     joint_velocity_log << rd_.q_dot_.transpose() << std::endl;
-                    foot_traj_log << rd_.link_local_[Left_Foot].x_traj.transpose() << " " << rd_.link_local_[Right_Foot].x_traj.transpose()  << " "
-                                  << rd_.link_local_[Left_Foot].xpos.transpose() << " " << rd_.link_local_[Right_Foot].xpos.transpose() << std::endl;
-                    torque_joint_log << pd_torque_4.head(12).transpose() << " " << rd_.q_torque_.head(12).transpose() << std::endl;
-                    torque_net_log << net_torque_4.transpose() << std::endl;
+                    torque_joint_log << rd_.torque_desired.head(12).transpose() << " " << rd_.q_torque_.head(12).transpose() << std::endl;
+                    torque_net_log << net_torque.transpose() << std::endl;
 
-                    if(!dc_.simMode){
-                        rd_.torque_desired = WBC::JointTorqueToMotorTorque(rd_, rd_.torque_desired);
+                    if (!dc_.simMode)
+                    {
+                        rd_.torque_desired = rd_.four_bar_Jaco_.transpose() * rd_.torque_desired;
                         torque_motor_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_motor_.transpose() << std::endl;
                     }
-
                 }
 #ifdef COMPILE_CC
                 else if (dc_.task_cmd_.task_mode >= 5 && dc_.task_cmd_.task_mode < 10)
