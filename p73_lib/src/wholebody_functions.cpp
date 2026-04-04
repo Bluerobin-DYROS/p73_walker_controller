@@ -214,12 +214,12 @@ namespace WBC
     {
         if (g_models_ready) return;
         try {
-            std::string p = "/home/bluerobin/ros2_ws/src/p73_walker_controller/p73_lib/src/actuatornet_models/";
+            std::string p = "/home/dyros/ros2_ws/src/p73_walker_controller/p73_lib/src/actuatornet_models/";
             std::vector<std::string> model_names = {
-                "p73_left_hip_roll",  "p73_left_hip_pitch", "p73_left_hip_yaw",
-                "p73_left_knee_pitch","p73_left_ankle",
-                "p73_right_hip_roll", "p73_right_hip_pitch","p73_right_hip_yaw",
-                "p73_right_knee_pitch","p73_right_ankle"
+                "p73_left_hip_roll",   "p73_left_hip_pitch",  "p73_left_hip_yaw",
+                "p73_left_knee_pitch", "p73_left_ankle_pitch","p73_left_ankle_roll",
+                "p73_right_hip_roll",  "p73_right_hip_pitch", "p73_right_hip_yaw",
+                "p73_right_knee_pitch","p73_right_ankle_pitch","p73_right_ankle_roll"
             };
             g_session_options.SetIntraOpNumThreads(1);
             g_session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
@@ -272,27 +272,19 @@ namespace WBC
         int idx_t1 = HISTORY_SIZE - 11;  // t-10   = col 10
         int idx_t2 = 0;                  // t-20   = col 0
 
-        std::vector<std::vector<int>> joint_groups = {
-            {0}, {1}, {2}, {3}, {4,5},
-            {6}, {7}, {8}, {9}, {10,11}
-        };
+
+        const int joint_index[12] = {0,1,2,3,4,5,6,7,8,9,10,11};
+        const int feature_size = 6;
         Eigen::Vector12d inferred_torque = Eigen::Vector12d::Zero();
 
         Ort::AllocatorWithDefaultOptions allocator;
-        for (int i = 0; i < 10; ++i) {
-            int num_joints  = joint_groups[i].size();
-            int feature_size = num_joints * 6;
+        for (int i = 0; i < 12; ++i) {
+            int j = joint_index[i];
 
-            std::vector<float> features(feature_size);
-            int f_idx = 0;
-            for (int j : joint_groups[i]) {
-                features[f_idx++] = e_hist(j, idx_t0);
-                features[f_idx++] = e_hist(j, idx_t1);
-                features[f_idx++] = e_hist(j, idx_t2);
-                features[f_idx++] = v_hist(j, idx_t0);
-                features[f_idx++] = v_hist(j, idx_t1);
-                features[f_idx++] = v_hist(j, idx_t2);
-            }
+            std::array<float, 6> features = {
+                (float)e_hist(j, idx_t0), (float)e_hist(j, idx_t1), (float)e_hist(j, idx_t2),
+                (float)v_hist(j, idx_t0), (float)v_hist(j, idx_t1), (float)v_hist(j, idx_t2)
+            };
 
             std::array<int64_t, 2> input_shape{1, feature_size};
             Ort::MemoryInfo mem_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
@@ -308,9 +300,7 @@ namespace WBC
                 auto output_tensors = g_sessions[i].Run(
                     Ort::RunOptions{nullptr}, input_names, &input_tensor, 1, output_names, 1);
                 float* out_data = output_tensors[0].GetTensorMutableData<float>();
-                for (int j = 0; j < num_joints; ++j) {
-                    inferred_torque(joint_groups[i][j]) = out_data[j] / 0.01f;
-                }
+                inferred_torque(j) = out_data[0] / 0.01f;
             } catch (const Ort::Exception& e) {
                 std::cerr << "Error during inference " << i << ": " << e.what() << std::endl;
             }

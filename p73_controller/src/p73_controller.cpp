@@ -17,8 +17,7 @@ P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     , cc_(*new CustomController(dc_, rd_))
     #endif
 {
-    data_dir = "/home/bluerobin/ros2_ws/src/p73_walker_controller/logging/data/";
-
+    data_dir = "/home/dyros/ros2_ws/src/p73_walker_controller/logging/data/";
     joint_desired_log.open(data_dir / "joint_desired_log.txt");
     joint_position_log.open(data_dir / "joint_position_log.txt");
     joint_velocity_log.open(data_dir / "joint_velocity_log.txt");
@@ -350,9 +349,9 @@ void *P73Controller::TaskCtrlThread()
                     static Eigen::VectorQd q_last_ = Eigen::VectorQd::Zero();
 
                     // Chirp configuration
-                    const double chirp_amplitude_ = 0.3;  // [rad]
+                    const double chirp_amplitude_ = 0.05;  // [rad]
                     const double chirp_f0_ = 0.10;         // [Hz]
-                    const double chirp_f1_ = 1.00;         // [Hz]
+                    const double chirp_f1_ = 3.00;         // [Hz]
                     const double chirp_duration_ = 30.0;   // [s]
 
                     const double current_time = rd_.control_time_;
@@ -426,8 +425,6 @@ void *P73Controller::TaskCtrlThread()
                     for (int i=0; i<MODEL_DOF; i++){
                         rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
                     }
-
-                    // ActuatorNet runs in background for logging only (skip first 0.02s while buffer fills)
                     double elapsed_time = rd_.control_time_ - chirp_start_time;
                     Eigen::Vector12d net_torque = WBC::inferActuatorTorqueFromNet(rd_, elapsed_time);
 
@@ -539,7 +536,6 @@ void *P73Controller::TaskCtrlThread()
                         rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
                     }
 
-                    // ActuatorNet runs in background for logging only (skip first 0.02s while buffer fills)
                     double elapsed_time = rd_.control_time_ - start_time;
                     Eigen::Vector12d net_torque = WBC::inferActuatorTorqueFromNet(rd_, elapsed_time);
 
@@ -561,10 +557,10 @@ void *P73Controller::TaskCtrlThread()
                     static bool is_ik_init = true;
                     static double start_time = 0.0;
 
-                    constexpr double circle_period = 2.0;   // Should be higher than 1.0
+                    constexpr double circle_period = 1.0;   // Should be higher than 1.0
                     // constexpr double circle_radius = 0.02;
                     // constexpr double circle_period = 1.0;
-                    constexpr double circle_radius = 0.03;  // should be smaller than 0.5
+                    constexpr double circle_radius = 0.05;  // should be smaller than 0.5
 
 
                     static std::string urdf_path;
@@ -717,7 +713,6 @@ void *P73Controller::TaskCtrlThread()
                         rd_.torque_desired(i) = rd_.Kp_j[i] * (rd_.q_desired(i) - rd_.q_(i)) + rd_.Kd_j[i] * (0.0 - rd_.q_dot_(i));
                     }
 
-                    // ActuatorNet runs in background for logging only (skip first 0.02s while buffer fills)
                     double elapsed_time = rd_.control_time_ - start_time;
                     Eigen::Vector12d net_torque = WBC::inferActuatorTorqueFromNet(rd_, elapsed_time);
 
@@ -733,6 +728,7 @@ void *P73Controller::TaskCtrlThread()
                         rd_.torque_desired = rd_.four_bar_Jaco_.transpose() * rd_.torque_desired;
                         torque_motor_log << rd_.torque_desired.transpose() << " " << rd_.q_torque_motor_.transpose() << std::endl;
                     }
+
                 }
 #ifdef COMPILE_CC
                 else if (dc_.task_cmd_.task_mode >= 5 && dc_.task_cmd_.task_mode < 10)
