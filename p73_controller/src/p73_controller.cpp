@@ -17,7 +17,7 @@ P73Controller::P73Controller(StateEstimator &stm, rclcpp::Node::SharedPtr node)
     , cc_(*new CustomController(dc_, rd_))
     #endif
 {
-    data_dir = "/home/dyros/ros2_ws/src/p73_walker_controller/logging/data/";
+    data_dir = "/home/bluerobin/ros2_ws/src/p73_walker_controller/logging/data/";
     joint_desired_log.open(data_dir / "joint_desired_log.txt");
     joint_position_log.open(data_dir / "joint_position_log.txt");
     joint_velocity_log.open(data_dir / "joint_velocity_log.txt");
@@ -119,10 +119,10 @@ void *P73Controller::TaskCtrlThread()
                     static Eigen::VectorQd q_init_ = Eigen::VectorQd::Zero();
                     static Eigen::VectorQd q_init_motor_ = Eigen::VectorQd::Zero();
 
-                    const int sinusoid_joint_target_ = 5;
-                    const double sinusoid_joint_min_ = 0.2;
-                    const double sinusoid_joint_max_ = 0.2;
-                    const double sinusoid_period_ = 0.5;
+                    const int sinusoid_joint_target_ =  3;
+                    const double sinusoid_joint_min_ = 0.15;
+                    const double sinusoid_joint_max_ = 0.15;
+                    const double sinusoid_period_ = 1.0;
 
                     const double A = sinusoid_joint_max_;
                     const double B = sinusoid_joint_min_;
@@ -241,6 +241,8 @@ void *P73Controller::TaskCtrlThread()
                     joint_desired_log << rd_.q_desired(sinusoid_joint_target_) << std::endl;
                     joint_position_log << rd_.q_(sinusoid_joint_target_) << std::endl;
                     joint_velocity_log << rd_.q_dot_(sinusoid_joint_target_) << std::endl;
+                    torque_joint_log << torque_joint(sinusoid_joint_target_) << std::endl;
+                    torque_motor_log << torque_motor(sinusoid_joint_target_) << std::endl;
                 }
                 else if (dc_.task_cmd_.task_mode == 1)  // FRICTION COMPENSATION MODE
                 {
@@ -349,9 +351,9 @@ void *P73Controller::TaskCtrlThread()
                     static Eigen::VectorQd q_last_ = Eigen::VectorQd::Zero();
 
                     // Chirp configuration
-                    const double chirp_amplitude_ = 0.05;  // [rad]
+                    const double chirp_amplitude_ = 0.3;  // [rad]
                     const double chirp_f0_ = 0.10;         // [Hz]
-                    const double chirp_f1_ = 3.00;         // [Hz]
+                    const double chirp_f1_ = 1.00;         // [Hz]
                     const double chirp_duration_ = 30.0;   // [s]
 
                     const double current_time = rd_.control_time_;

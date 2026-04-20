@@ -32,7 +32,7 @@ axes = axes.flatten()
 for i, ax in enumerate(axes):
     ax.plot(t, actual_torque[:, i],  label="Actual (target)", linewidth=1.0)
     ax.plot(t, torque_net[:, i],     label="ActuatorNet",     linewidth=1.0, linestyle="--")
-    ax.plot(t, desired_torque[:, i], label="PD desired",      linewidth=0.8, alpha=0.5)
+    # ax.plot(t, desired_torque[:, i], label="PD desired",      linewidth=0.8, alpha=0.5)
     ax.set_title(JOINT_NAMES[i])
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("Torque [Nm]")
