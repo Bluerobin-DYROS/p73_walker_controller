@@ -202,17 +202,17 @@ StateEstimator::StateEstimator(DataContainer &dc)
     std::cout << std::endl;
 
     //--- Joint PD Gain
-    dc_.node_->declare_parameter<std::vector<double>>("Kp_j", std::vector<double>(MODEL_DOF, 0.0));
-    dc_.node_->declare_parameter<std::vector<double>>("Kd_j", std::vector<double>(MODEL_DOF, 0.0));
-    dc_.node_->get_parameter("Kp_j", rd_global_.Kp_j);
-    dc_.node_->get_parameter("Kd_j", rd_global_.Kd_j);
-    // rd_global_.Kp_j.resize(rd_global_.Kp_m.size());
-    // rd_global_.Kd_j.resize(rd_global_.Kd_m.size());
+    // dc_.node_->declare_parameter<std::vector<double>>("Kp_j", std::vector<double>(MODEL_DOF, 0.0));
+    // dc_.node_->declare_parameter<std::vector<double>>("Kd_j", std::vector<double>(MODEL_DOF, 0.0));
+    // dc_.node_->get_parameter("Kp_j", rd_global_.Kp_j);
+    // dc_.node_->get_parameter("Kd_j", rd_global_.Kd_j);
+    rd_global_.Kp_j.resize(rd_global_.Kp_m.size());
+    rd_global_.Kd_j.resize(rd_global_.Kd_m.size());
 
-    // for(int i = 0; i < MODEL_DOF; i++){
-    //     rd_global_.Kp_j[i] =     joint_armature[i] * wnwn[i];
-    //     rd_global_.Kd_j[i] = 2 * joint_armature[i] * wn[i];
-    // }
+    for(int i = 0; i < MODEL_DOF; i++){
+        rd_global_.Kp_j[i] =     joint_armature[i] * wnwn[i];
+        rd_global_.Kd_j[i] = 2 * joint_armature[i] * wn[i];
+    }
 
     std::cout << "Kp_j: " << " (size=" << rd_global_.Kp_j.size() << "): ";
     for (const auto &param : rd_global_.Kp_j)
