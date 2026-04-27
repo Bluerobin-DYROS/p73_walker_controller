@@ -10,8 +10,6 @@ find_package(tf2_eigen REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(p73_msgs REQUIRED)
 find_package(pinocchio REQUIRED)
-find_package(osqp REQUIRED)
-find_package(OsqpEigen REQUIRED)
 find_package(br_driver REQUIRED)
 
 set(ONNXRUNTIME_INCLUDE_DIR "/usr/local/include/onnxruntime")
@@ -25,7 +23,6 @@ endif()
 message(STATUS "ONNX Runtime: ${ONNXRUNTIME_LIB}")
 
 add_library(${PROJECT_NAME}
-  src/qp.cpp
   src/link.cpp
   src/wholebody_functions.cpp
   src/4bar_jac_func.cpp
@@ -42,8 +39,6 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(p73_lib
   Eigen3::Eigen
   pinocchio::pinocchio
-  osqp::osqp
-  OsqpEigen::OsqpEigen
   ${ONNXRUNTIME_LIB}
 )
 target_include_directories(${PROJECT_NAME} PUBLIC ${ONNXRUNTIME_INCLUDE_DIR})
@@ -66,7 +61,7 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 ament_export_targets(export_p73_lib HAS_LIBRARY_TARGET)
-ament_export_dependencies(rclcpp Eigen3 p73_msgs pinocchio osqp OsqpEigen tf2 tf2_eigen geometry_msgs br_driver)
+ament_export_dependencies(rclcpp Eigen3 p73_msgs pinocchio tf2 tf2_eigen geometry_msgs br_driver)
 ament_export_include_directories(include)
 
 ament_package()

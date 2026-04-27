@@ -776,7 +776,6 @@ void *P73Controller::TaskCtrlThread()
 void *P73Controller::ComputeSlowThread()
 {
     /*
-    This thread is used to compute whole body QP control
     */
     while (rclcpp::ok())
     {

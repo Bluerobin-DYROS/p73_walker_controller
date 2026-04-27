@@ -40,6 +40,13 @@ add_library(${PROJECT_NAME}_lib
   src/p73_controller.cpp
 )
 
+# Workaround: GCC 13 ICEs on heavy Pinocchio template instantiation under -Ofast.
+set_source_files_properties(
+  src/state_estimator.cpp
+  src/p73_controller.cpp
+  PROPERTIES COMPILE_OPTIONS "-O1"
+)
+
 ament_target_dependencies(${PROJECT_NAME}_lib
   rclcpp
   p73_msgs

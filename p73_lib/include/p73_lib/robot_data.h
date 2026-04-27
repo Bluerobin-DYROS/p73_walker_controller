@@ -13,7 +13,6 @@
 #include "br_driver.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "p73_msgs/msg/task_cmd.hpp"
-#include "p73_lib/link.h"
 #include "math_type_define.h"
 #include <limits>
 

@@ -99,70 +99,7 @@ namespace WBC
 
     VectorQd ContactForceFrictionConeConstraintTorque(RobotEigenData &rd_, Eigen::VectorQd command_torque)
     {
-        //--- Cost
-        Eigen::MatrixQQd H;
-        Eigen::VectorQd g;
 
-        H.setIdentity();
-        g.setZero();
-        g = (-1.0) * command_torque;
-
-        //--- Constraints
-        Eigen::MatrixXd A;
-        Eigen::VectorXd lbA, ubA;
-
-        unsigned int friction_cone_constraint_size = 17;
-        unsigned int total_variable_size = MODEL_DOF;
-        unsigned int total_constraint_size =  rd_.contact_index * friction_cone_constraint_size;
-        unsigned int contact_dof = rd_.contact_index * 6;
-
-        A.setZero(total_constraint_size, total_variable_size);
-        lbA.setZero(total_constraint_size);
-        ubA.setZero(total_constraint_size);
-
-        Eigen::MatrixXd total_force_const_matrix;
-        total_force_const_matrix.setZero(total_constraint_size, contact_dof);
-
-        for (int i = 0; i < rd_.contact_index; i++)
-        {
-            total_force_const_matrix.block(i * friction_cone_constraint_size, i * 6, friction_cone_constraint_size, 6) = rd_.ee_[rd_.ee_idx[i]].GetFrictionConeConstrainMatrix();
-        }
-
-        A   = total_force_const_matrix * rd_.J_C_INV_T.rightCols(total_variable_size);
-        lbA = total_force_const_matrix * rd_.P_C;
-        ubA.segment(0, total_constraint_size).setConstant(OsqpEigen::INFTY);
-
-        //--- Quadratic Programming
-        static CQuadraticProgram qp_torque_contact_;
-        static bool firstCalcQp = false;
-        if(!firstCalcQp)
-        {
-            qp_torque_contact_.InitializeProblemSize(total_variable_size, total_constraint_size);
-            qp_torque_contact_.setWarmStartOption();
-        
-            // qp_torque_contact_.PrintHessGrad();
-            // qp_torque_contact_.PrintSubjectToAx();
-            // qp_torque_contact_.PrintSubjectTox();
-
-            firstCalcQp = true;
-        }
-
-        qp_torque_contact_.UpdateMinProblem(H, g);
-        qp_torque_contact_.UpdateSubjectToAx(A, lbA, ubA);
-
-        Eigen::VectorXd torque_qp;
-        Eigen::VectorQd torque_safety;
-
-        if (qp_torque_contact_.solveQP(1000, torque_qp))
-        {
-            torque_safety = torque_qp.segment(0, MODEL_DOF);
-            return torque_safety;
-        }
-        else
-        {
-            std::cout << "===========QP SOLVE FAILED===========" << std::endl;
-            return command_torque;
-        }
     }
 
     void NullspaceInverseKinematics(RobotEigenData& rd_)

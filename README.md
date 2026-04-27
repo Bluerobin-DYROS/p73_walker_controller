@@ -56,28 +56,6 @@ sudo make install
 sudo apt install ros-jazzy-pinocchio
 ```
 
-#### OSQP
-```
-cd ~/Downloads
-git clone https://github.com/osqp/osqp
-cd osqp
-mkdir build && cd build
-cmake -G "Unix Makefiles" ..
-make
-sudo make install
-```
-#### OSQP-Eigen
-```
-cd ~/Downloads
-git clone https://github.com/robotology/osqp-eigen.git
-cd osqp-eigen
-mkdir build
-cd build
-cmake ..
-make
-sudo make install
-```
-
 #### Etc
 ```
 sudo apt update

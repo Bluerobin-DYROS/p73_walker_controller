@@ -3,7 +3,6 @@
 
 #include "p73_lib/robot_data.h"
 #include "p73_lib/4bar_jac_func.h"
-#include "qp.h"
 
 using namespace P73;
 
